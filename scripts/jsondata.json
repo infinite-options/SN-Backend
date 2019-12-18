@@ -1,0 +1,132 @@
+{
+  "apiURL": [
+    {
+      "name":"Whole Foods San Jose Alameda",
+      "url":"https://products.wholefoodsmarket.com/api/search?sort=relevance&store=10259&skip=0&filters=%5B%7B%22ns%22%3A%22category%22%2C%22key%22%3A%22produce%22%2C%22value%22%3A%22produce%22%7D%2C%7B%22ns%22%3A%22subcategory%22%2C%22key%22%3A%22fresh-vegetables%22%2C%22value%22%3A%22produce.fresh-vegetables%22%7D%5D",
+      "itemArrayAccessKeys": ["list"],
+      "itemAccessKeys": ["list","apiItemIndex","name"],
+      "priceAccessKeys": ["list","apiItemIndex","store","price"],
+      "unitAccessKeys": ["list","apiItemIndex","store","retail_unit"],
+      "saleAccessKeysExist":
+        {
+          "isOnSaleAccessKeys": ["list","apiItemIndex","store","onSale"],
+          "salePriceAccessKeys": ["list","apiItemIndex","store","onSale","price"]
+        },
+      "zipCode": "95126"
+    },
+    {
+      "name":"Whole Foods Pearl District Portland",
+      "url":"https://products.wholefoodsmarket.com/api/search?sort=relevance&store=10148&skip=0&filters=%5B%7B%22ns%22%3A%22category%22%2C%22key%22%3A%22produce%22%2C%22value%22%3A%22produce%22%7D%2C%7B%22ns%22%3A%22subcategory%22%2C%22key%22%3A%22fresh-vegetables%22%2C%22value%22%3A%22produce.fresh-vegetables%22%7D%5D",
+      "itemArrayAccessKeys": ["list"],
+      "itemAccessKeys": ["list","apiItemIndex","name"],
+      "priceAccessKeys": ["list","apiItemIndex","store","price"],
+      "unitAccessKeys": ["list","apiItemIndex","store","retail_unit"],
+      "saleAccessKeysExist":
+        {
+          "isOnSaleAccessKeys": ["list","apiItemIndex","store","onSale"],
+          "salePriceAccessKeys": ["list","apiItemIndex","store","onSale","price"]
+        },
+      "zipCode": "97209"
+    },
+    {
+      "name":"Whole Foods San Jose Blossom Hill",
+      "url":"https://products.wholefoodsmarket.com/api/search?sort=relevance&store=10320&skip=0&filters=%5B%7B%22ns%22%3A%22category%22%2C%22key%22%3A%22produce%22%2C%22value%22%3A%22produce%22%7D%2C%7B%22ns%22%3A%22subcategory%22%2C%22key%22%3A%22fresh-vegetables%22%2C%22value%22%3A%22produce.fresh-vegetables%22%7D%5D",
+      "itemArrayAccessKeys": ["list"],
+      "itemAccessKeys": ["list","apiItemIndex","name"],
+      "priceAccessKeys": ["list","apiItemIndex","store","price"],
+      "unitAccessKeys": ["list","apiItemIndex","store","retail_unit"],
+      "saleAccessKeysExist":
+        {
+          "isOnSaleAccessKeys": ["list","apiItemIndex","store","onSale"],
+          "salePriceAccessKeys": ["list","apiItemIndex","store","onSale","price"]
+        },
+      "zipCode": "95118"
+    },
+    {
+      "name":"Whole Foods Portland Maine",
+      "url":"https://products.wholefoodsmarket.com/api/search?sort=relevance&store=10291&skip=0&filters=%5B%7B%22ns%22%3A%22category%22%2C%22key%22%3A%22produce%22%2C%22value%22%3A%22produce%22%7D%2C%7B%22ns%22%3A%22subcategory%22%2C%22key%22%3A%22fresh-vegetables%22%2C%22value%22%3A%22produce.fresh-vegetables%22%7D%5D",
+      "itemArrayAccessKeys": ["list"],
+      "itemAccessKeys": ["list","apiItemIndex","name"],
+      "priceAccessKeys": ["list","apiItemIndex","store","price"],
+      "unitAccessKeys": ["list","apiItemIndex","store","retail_unit"],
+      "saleAccessKeysExist":
+        {
+          "isOnSaleAccessKeys": ["list","apiItemIndex","store","onSale"],
+          "salePriceAccessKeys": ["list","apiItemIndex","store","onSale","price"]
+        },
+      "zipCode": "04101"
+    },
+    {
+      "name":"Safeway in 95050 (Santa Clara, CA)",
+      "url":"https://shop.safeway.com/bin/safeway/product/aemaisle?aisleId=1_23_2&storeId=1483",
+      "itemArrayAccessKeys": ["productsinfo"],
+      "itemAccessKeys": ["productsinfo","apiItemIndex","description"],
+      "priceAccessKeys": ["productsinfo","apiItemIndex","pricePer"],
+      "unitAccessKeys": ["productsinfo","apiItemIndex","unitOfMeasure"],
+      "saleAccessKeysExist": null,
+      "zipCode": "95050"
+    },
+    {
+      "name":"Safeway in 97229 (Portland, OR)",
+      "url":"https://shop.safeway.com/bin/safeway/product/aemaisle?aisleId=1_23_2&storeId=1525",
+      "itemArrayAccessKeys": ["productsinfo"],
+      "itemAccessKeys": ["productsinfo","apiItemIndex","description"],
+      "priceAccessKeys": ["productsinfo","apiItemIndex","pricePer"],
+      "unitAccessKeys": ["productsinfo","apiItemIndex","unitOfMeasure"],
+      "saleAccessKeysExist": null,
+      "zipCode": "97229"
+    },
+    {
+      "name":"Safeway in 22207 (Arlington, VA)",
+      "url":"https://shop.safeway.com/bin/safeway/product/aemaisle?aisleId=1_23_2&storeId=3250",
+      "itemArrayAccessKeys": ["productsinfo"],
+      "itemAccessKeys": ["productsinfo","apiItemIndex","description"],
+      "priceAccessKeys": ["productsinfo","apiItemIndex","pricePer"],
+      "unitAccessKeys": ["productsinfo","apiItemIndex","unitOfMeasure"],
+      "saleAccessKeysExist": null,
+      "zipCode": "22207"
+    },
+    {
+      "name":"Safeway in 96816 (Honolulu, HI)",
+      "url":"https://shop.safeway.com/bin/safeway/product/aemaisle?aisleId=1_23_2&storeId=2944",
+      "itemArrayAccessKeys": ["productsinfo"],
+      "itemAccessKeys": ["productsinfo","apiItemIndex","description"],
+      "priceAccessKeys": ["productsinfo","apiItemIndex","pricePer"],
+      "unitAccessKeys": ["productsinfo","apiItemIndex","unitOfMeasure"],
+      "saleAccessKeysExist": null,
+      "zipCode": "96816"
+    }
+  ],
+  "genericItems": [
+    {
+      "name":"Broccoli",
+      "organic":0,
+      "pricePerUnit":"lb"
+    },
+    {
+      "name":"Broccoli",
+      "organic":1,
+      "pricePerUnit":"lb"
+    },
+    {
+      "name":"Green Asparagus",
+      "organic":0,
+      "pricePerUnit":"lb"
+    },
+    {
+      "name":"Green Asparagus",
+      "organic":1,
+      "pricePerUnit":"lb"
+    },
+    {
+      "name":"Iceberg Lettuce",
+      "organic":0,
+      "pricePerUnit":"lb"
+    },
+    {
+      "name":"Cucumber",
+      "organic":0,
+      "pricePerUnit":"lb"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ flask
 flask-restful
 flask_cors
 Flask-Mail
+pymysql
 pytz
 boto3
 awscli
