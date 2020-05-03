@@ -80,6 +80,16 @@ def kitchenExists(kitchen_id):
 
     return not kitchen.get('Items') == []
 
+def couponExists(coupon_id):
+    # scan to check if the kitchen name exists
+    coupon = db.scan(TableName='coupons',
+        FilterExpression='coupon_id = :val',
+        ExpressionAttributeValues={
+            ':val': {'S': coupon_id}
+        }
+    )
+
+    return not coupon.get('Items') == []
 
 class MealOrders(Resource):
     def post(self):
@@ -359,7 +369,130 @@ class Kitchens(Resource):
         except:
             raise BadRequest('Request failed. Please try again later.')
 
+class Coupons(Resource):
+    @staticmethod
+    def check_N_or_S(fi_eld):
+        if 'N' in fi_eld.keys():
+            if float(fi_eld['N'])>int(fi_eld['N']):
+                return float(fi_eld['N'])
+            else:
+                return int(fi_eld['N'])
+        else:
+            return fi_eld['S']
+            
+    def get(self):
+        """Returns all kitchens"""
+        response = {}
+        pe = "coupon_id, active, credit, frequency, lim, notes, recurring"
+        try:
+            coupons = db.scan(TableName='coupons',
+                ProjectionExpression=pe
+            )
 
+            result = []
+            # print(coupons['Items'])
+            for coupon in coupons['Items']:
+                my_coupon={}
+                my_coupon['credit'] = self.check_N_or_S(coupon['credit'])
+                my_coupon['frequency'] = self.check_N_or_S(coupon['frequency'])
+                my_coupon['notes'] = self.check_N_or_S(coupon['notes'])
+                my_coupon['coupon_id'] = self.check_N_or_S(coupon['coupon_id'])
+                my_coupon['recurring'] = coupon['recurring']['BOOL']
+                my_coupon['lim'] = self.check_N_or_S(coupon['lim'])
+                result.append(my_coupon)
+            
+            # print(result)
+
+            response['message'] = 'Request successful'
+            response['result'] = result
+            return response, 200
+        except:
+            raise BadRequest('Request failed. Please try again later.')
+
+
+    def post(self):
+        response = {}
+        
+        body = request.get_json(force=True)
+        
+        if body.get('credit') == None \
+          or body.get('active') == None \
+          or body.get('frequency') == None \
+          or body.get('notes') == None \
+          or body.get('num_used') == None \
+          or body.get('recurring') == None \
+          or body.get('lim') == None:  
+            raise BadRequest('Request failed. Please provide required details.')
+        
+        coupon_id = uuid.uuid4().hex
+        
+        try:
+            add_coupon = db.put_item(TableName='coupons',
+                Item={'coupon_id': {'S': coupon_id},
+                        'credit': {'N': str(body['credit'])},
+                        'active': {'BOOL': body['active']},
+                        'frequency': {'N': str(body['frequency'])},
+                        'notes': {'S': body['notes']},
+                        'lim': {'N': str(body['lim'])},
+                        'recurring': {'BOOL': body['recurring']},
+                        'num_used': {'N': str(body['num_used'])}
+                }
+            )
+            response['message'] = 'Request successful'
+            return response, 201
+        except:
+            raise BadRequest('Request failed. Please try again later.')
+
+class Coupon(Resource):
+    def get(self, coupon_id):
+        coupon = db.scan(TableName='coupons',
+            FilterExpression='coupon_id = :val',
+            ExpressionAttributeValues={
+                ':val': {'S': coupon_id}
+            }
+        )
+        if (coupon.get('Items') == []):
+            return "Kitchen not found.", 404
+        return coupon, 200
+    
+    def put(self, coupon_id):
+    
+        response = {}
+        # data = request.get_json(force=True)
+
+        if not couponExists(coupon_id):
+            return "Coupon not found.", 404
+
+        product = db.scan(TableName='coupons',
+            FilterExpression='coupon_id = :val',
+            ProjectionExpression='lim, num_used',
+            ExpressionAttributeValues={
+                ':val': {'S': coupon_id}
+            })
+        
+        lim1 =product["Items"][0]["lim"]["N"]
+        num_used1 =product["Items"][0]["num_used"]["N"]
+        if int(lim1)==0:
+            return "Coupon depleted"
+        try:  
+            # print(product)
+            actie = True
+            if int(lim1)-1==0:
+                actie = not actie
+            update_coupon = db.update_item(TableName='coupons',
+                Key={'coupon_id': {'S': str(coupon_id)}},
+                UpdateExpression='SET lim = :l, num_used = :nu, active = :ac',
+                ExpressionAttributeValues={
+                    ':l': {'N': str(int(lim1)-1)},
+                    ':nu': {'N': str(int(num_used1)+1)},
+                    ':ac': {'BOOL': actie}
+                }
+            )
+            response['message'] = 'Request successful'
+            return response, 201
+        except:
+            raise BadRequest('Request failed. Please try again later.')
+        
 class Kitchen(Resource):
     def get(self, kitchen_id):
         kitchen = db.scan(TableName='kitchens',
@@ -647,6 +780,9 @@ api.add_resource(Meals, '/api/v1/meals/<string:kitchen_id>')
 api.add_resource(OrderReport, '/api/v1/orders/report/<string:kitchen_id>')
 api.add_resource(Kitchens, '/api/v1/kitchens')
 api.add_resource(Kitchen, '/api/v1/kitchen/<string:kitchen_id>')
+
+api.add_resource(Coupons, '/api/v1/coupons')
+api.add_resource(Coupon, '/api/v1/coupon/<string:coupon_id>')
 
 if __name__ == '__main__':
     app.run(host='localhost', port='5000')
