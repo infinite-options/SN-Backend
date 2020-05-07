@@ -9,6 +9,7 @@ import os
 import uuid
 import boto3
 import json
+import math
 from datetime import datetime
 from pytz import timezone
 
@@ -156,7 +157,7 @@ class MealOrders(Resource):
                 order_details.append(item)
 
         order_items = [{"M": x} for x in order_details]
-
+        
         try:
             add_order = db.put_item(TableName='meal_orders',
                 Item={'order_id': {'S': order_id},
@@ -182,25 +183,25 @@ class MealOrders(Resource):
                 ProjectionExpression='kitchen_name, street, city, \
                     st, phone_number, pickup_time, first_name, kitchen_id, email'
             )
-
+            
             customerMsg = Message(subject='Order Confirmation',
-                          sender=app.config['MAIL_USERNAME'],
-                          html=render_template('emailTemplate.html',
-                          order_items=order_details,
-                          kitchen=kitchen['Item'],
-                          totalAmount=totalAmount,
-                          name=data['name']),
-                          recipients=[data['email']])
-
+                            sender=app.config['MAIL_USERNAME'],
+                            html=render_template('emailTemplate.html',
+                            order_items=order_details,
+                            kitchen=kitchen['Item'],
+                            totalAmount=totalAmount,
+                            name=data['name']),
+                            recipients=[data['email']])
+        
             prashantMsg = Message(subject='Order Confirmation',
-                          sender=app.config['MAIL_USERNAME'],
-                          html=render_template('emailTemplate.html',
-                          order_items=order_details,
-                          kitchen=kitchen['Item'],
-                          totalAmount=totalAmount,
-                          name=data['name']),
-                          recipients=["pmarathay@gmail.com"])
-
+                            sender=app.config['MAIL_USERNAME'],
+                            html=render_template('emailTemplate.html',
+                            order_items=order_details,
+                            kitchen=kitchen['Item'],
+                            totalAmount=totalAmount,
+                            name=data['name']),
+                            recipients=["pmarathay@gmail.com"])
+        
             BusinessMsg = Message(subject='Order Confirmation',
                           sender=app.config['MAIL_USERNAME'],
                           html=render_template('businessEmailTemplate.html',
@@ -373,7 +374,7 @@ class Coupons(Resource):
     @staticmethod
     def check_N_or_S(fi_eld):
         if 'N' in fi_eld.keys():
-            if float(fi_eld['N'])>int(fi_eld['N']):
+            if float(fi_eld['N'])>round(float(fi_eld['N'])):
                 return float(fi_eld['N'])
             else:
                 return int(fi_eld['N'])
@@ -383,7 +384,7 @@ class Coupons(Resource):
     def get(self):
         """Returns all kitchens"""
         response = {}
-        pe = "coupon_id, active, credit, frequency, lim, notes, recurring"
+        pe = "coupon_id, active, credit, frequency, lim, notes, recurring, num_used"
         try:
             coupons = db.scan(TableName='coupons',
                 ProjectionExpression=pe
@@ -399,9 +400,9 @@ class Coupons(Resource):
                 my_coupon['coupon_id'] = self.check_N_or_S(coupon['coupon_id'])
                 my_coupon['recurring'] = coupon['recurring']['BOOL']
                 my_coupon['lim'] = self.check_N_or_S(coupon['lim'])
+                my_coupon['num_used'] = self.check_N_or_S(coupon['num_used'])
+                my_coupon['active'] = coupon['active']['BOOL']
                 result.append(my_coupon)
-            
-            # print(result)
 
             response['message'] = 'Request successful'
             response['result'] = result
