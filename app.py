@@ -384,7 +384,7 @@ class Coupons(Resource):
     def get(self):
         """Returns all kitchens"""
         response = {}
-        pe = "coupon_id, active, credit, frequency, lim, notes, recurring, num_used"
+        pe = "coupon_id, active, credit, frequency, lim, notes, recurring, num_used, email_av, email_id"
         try:
             coupons = db.scan(TableName='coupons',
                 ProjectionExpression=pe
@@ -402,6 +402,9 @@ class Coupons(Resource):
                 my_coupon['lim'] = self.check_N_or_S(coupon['lim'])
                 my_coupon['num_used'] = self.check_N_or_S(coupon['num_used'])
                 my_coupon['active'] = coupon['active']['BOOL']
+                my_coupon['email_av'] = coupon['email_av']['BOOL']
+                if my_coupon['email_av']:
+                    my_coupon['email_id'] = self.check_N_or_S(coupon['email_id'])
                 result.append(my_coupon)
 
             response['message'] = 'Request successful'
@@ -422,23 +425,43 @@ class Coupons(Resource):
           or body.get('notes') == None \
           or body.get('num_used') == None \
           or body.get('recurring') == None \
-          or body.get('lim') == None:  
+          or body.get('lim') == None \
+          or body.get('email_id') == None:  
             raise BadRequest('Request failed. Please provide required details.')
         
+        email_av = True
         coupon_id = uuid.uuid4().hex
         
         try:
-            add_coupon = db.put_item(TableName='coupons',
-                Item={'coupon_id': {'S': coupon_id},
-                        'credit': {'N': str(body['credit'])},
-                        'active': {'BOOL': body['active']},
-                        'frequency': {'N': str(body['frequency'])},
-                        'notes': {'S': body['notes']},
-                        'lim': {'N': str(body['lim'])},
-                        'recurring': {'BOOL': body['recurring']},
-                        'num_used': {'N': str(body['num_used'])}
-                }
-            )
+            if len(body['email_id'])==0:
+                email_av=False
+                add_coupon = db.put_item(TableName='coupons',
+                    Item={'coupon_id': {'S': coupon_id},
+                            'credit': {'N': str(body['credit'])},
+                            'active': {'BOOL': body['active']},
+                            'frequency': {'N': str(body['frequency'])},
+                            'notes': {'S': body['notes']},
+                            'lim': {'N': str(body['lim'])},
+                            'recurring': {'BOOL': body['recurring']},
+                            'num_used': {'N': str(body['num_used'])},
+                            'email_av': {'BOOL': email_av}
+                    }
+                )
+            else:
+                add_coupon = db.put_item(TableName='coupons',
+                    Item={'coupon_id': {'S': coupon_id},
+                            'credit': {'N': str(body['credit'])},
+                            'active': {'BOOL': body['active']},
+                            'frequency': {'N': str(body['frequency'])},
+                            'notes': {'S': body['notes']},
+                            'lim': {'N': str(body['lim'])},
+                            'recurring': {'BOOL': body['recurring']},
+                            'num_used': {'N': str(body['num_used'])},
+                            'email_av': {'BOOL': email_av},
+                            'email_id': {'S': body['email_id']}
+                    }
+                )
+
             response['message'] = 'Request successful'
             return response, 201
         except:
@@ -781,7 +804,6 @@ api.add_resource(Meals, '/api/v1/meals/<string:kitchen_id>')
 api.add_resource(OrderReport, '/api/v1/orders/report/<string:kitchen_id>')
 api.add_resource(Kitchens, '/api/v1/kitchens')
 api.add_resource(Kitchen, '/api/v1/kitchen/<string:kitchen_id>')
-
 api.add_resource(Coupons, '/api/v1/coupons')
 api.add_resource(Coupon, '/api/v1/coupon/<string:coupon_id>')
 
