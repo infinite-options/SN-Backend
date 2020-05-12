@@ -384,7 +384,7 @@ class Coupons(Resource):
     def get(self):
         """Returns all kitchens"""
         response = {}
-        pe = "coupon_id, active, credit, frequency, lim, notes, recurring, num_used, email_av, email_id"
+        pe = "coupon_id, active, credit, frequency, lim, notes, recurring, num_used, email_av, email_id, coupon_type"
         try:
             coupons = db.scan(TableName='coupons',
                 ProjectionExpression=pe
@@ -403,6 +403,7 @@ class Coupons(Resource):
                 my_coupon['num_used'] = self.check_N_or_S(coupon['num_used'])
                 my_coupon['active'] = coupon['active']['BOOL']
                 my_coupon['email_av'] = coupon['email_av']['BOOL']
+                my_coupon['coupon_type'] = self.check_N_or_S(coupon['coupon_type'])
                 if my_coupon['email_av']:
                     my_coupon['email_id'] = self.check_N_or_S(coupon['email_id'])
                 result.append(my_coupon)
@@ -426,14 +427,14 @@ class Coupons(Resource):
           or body.get('num_used') == None \
           or body.get('recurring') == None \
           or body.get('lim') == None \
-          or body.get('email_id') == None:  
+          or body.get('coupon_type') == None:  
             raise BadRequest('Request failed. Please provide required details.')
         
         email_av = True
         coupon_id = uuid.uuid4().hex
         
         try:
-            if len(body['email_id'])==0:
+            if body.get('email_id') == None:
                 email_av=False
                 add_coupon = db.put_item(TableName='coupons',
                     Item={'coupon_id': {'S': coupon_id},
@@ -444,6 +445,7 @@ class Coupons(Resource):
                             'lim': {'N': str(body['lim'])},
                             'recurring': {'BOOL': body['recurring']},
                             'num_used': {'N': str(body['num_used'])},
+                            'coupon_type': {'N': str(body['coupon_type'])},
                             'email_av': {'BOOL': email_av}
                     }
                 )
@@ -458,6 +460,7 @@ class Coupons(Resource):
                             'recurring': {'BOOL': body['recurring']},
                             'num_used': {'N': str(body['num_used'])},
                             'email_av': {'BOOL': email_av},
+                            'coupon_type': {'N': str(body['coupon_type'])},
                             'email_id': {'S': body['email_id']}
                     }
                 )
