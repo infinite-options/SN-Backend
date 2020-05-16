@@ -11,7 +11,10 @@ import boto3
 import json
 import math
 from datetime import datetime
+from datetime import timedelta
 from pytz import timezone
+import random
+import string
 
 from flask import Flask, request, render_template
 from flask_restful import Resource, Api
@@ -92,6 +95,9 @@ def couponExists(coupon_id):
 
     return not coupon.get('Items') == []
 
+
+# ===========================================================
+
 class MealOrders(Resource):
     def post(self):
         """Collects the information of the order
@@ -124,6 +130,10 @@ class MealOrders(Resource):
         if data.get('phone') == None:
             raise BadRequest('Request failed. Please provide phone')
         if data.get('kitchen_id') == None:
+            raise BadRequest('Request failed. Please provide kitchen_id')
+        if data.get('delivery_instructions') == None:
+            raise BadRequest('Request failed. Please provide kitchen_id')
+        if data.get('address_unit') == None:
             raise BadRequest('Request failed. Please provide kitchen_id')
 
         kitchenFound = kitchenExists(data['kitchen_id'])
@@ -174,6 +184,8 @@ class MealOrders(Resource):
                       'paymentType': {'S': data['paymentType']},
                       'order_items':{'L': order_items},
                       'phone': {'S': str(data['phone'])},
+                      'delivery_instructions' : {'S': data['delivery_instructions']},
+                      'address_unit' : {'S': data['address_unit']},
                       'kitchen_id': {'S': str(data['kitchen_id'])}
                 }
             )
@@ -384,7 +396,7 @@ class Coupons(Resource):
     def get(self):
         """Returns all kitchens"""
         response = {}
-        pe = "coupon_id, active, credit, frequency, lim, notes, recurring, num_used, email_av, email_id, coupon_type"
+        pe = "coupon_id, active, credit, days, lim, notes, recurring, num_used, email_id, coupon_type, date_expired"
         try:
             coupons = db.scan(TableName='coupons',
                 ProjectionExpression=pe
@@ -395,16 +407,16 @@ class Coupons(Resource):
             for coupon in coupons['Items']:
                 my_coupon={}
                 my_coupon['credit'] = self.check_N_or_S(coupon['credit'])
-                my_coupon['frequency'] = self.check_N_or_S(coupon['frequency'])
+                my_coupon['days'] = self.check_N_or_S(coupon['days'])
                 my_coupon['notes'] = self.check_N_or_S(coupon['notes'])
                 my_coupon['coupon_id'] = self.check_N_or_S(coupon['coupon_id'])
                 my_coupon['recurring'] = coupon['recurring']['BOOL']
                 my_coupon['lim'] = self.check_N_or_S(coupon['lim'])
                 my_coupon['num_used'] = self.check_N_or_S(coupon['num_used'])
                 my_coupon['active'] = coupon['active']['BOOL']
-                my_coupon['email_av'] = coupon['email_av']['BOOL']
                 my_coupon['coupon_type'] = self.check_N_or_S(coupon['coupon_type'])
-                if my_coupon['email_av']:
+                my_coupon['date_expired'] = self.check_N_or_S(coupon['date_expired'])
+                if 'email_id' in coupon:
                     my_coupon['email_id'] = self.check_N_or_S(coupon['email_id'])
                 result.append(my_coupon)
 
@@ -422,7 +434,7 @@ class Coupons(Resource):
         
         if body.get('credit') == None \
           or body.get('active') == None \
-          or body.get('frequency') == None \
+          or body.get('days') == None \
           or body.get('notes') == None \
           or body.get('num_used') == None \
           or body.get('recurring') == None \
@@ -431,22 +443,27 @@ class Coupons(Resource):
             raise BadRequest('Request failed. Please provide required details.')
         
         email_av = True
-        coupon_id = uuid.uuid4().hex
+        while True:
+            coupon_id = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            if couponExists(coupon_id):
+                continue
+            else:
+                break
         
+        exp_date = (datetime.now(tz=timezone('US/Pacific'))+timedelta(days=body['days'])).strftime("%Y-%m-%d")
         try:
             if body.get('email_id') == None:
-                email_av=False
                 add_coupon = db.put_item(TableName='coupons',
                     Item={'coupon_id': {'S': coupon_id},
                             'credit': {'N': str(body['credit'])},
                             'active': {'BOOL': body['active']},
-                            'frequency': {'N': str(body['frequency'])},
+                            'days': {'N': str(body['days'])},
                             'notes': {'S': body['notes']},
                             'lim': {'N': str(body['lim'])},
                             'recurring': {'BOOL': body['recurring']},
                             'num_used': {'N': str(body['num_used'])},
-                            'coupon_type': {'N': str(body['coupon_type'])},
-                            'email_av': {'BOOL': email_av}
+                            'date_expired': {'S': exp_date},
+                            'coupon_type': {'N': str(body['coupon_type'])}
                     }
                 )
             else:
@@ -454,12 +471,12 @@ class Coupons(Resource):
                     Item={'coupon_id': {'S': coupon_id},
                             'credit': {'N': str(body['credit'])},
                             'active': {'BOOL': body['active']},
-                            'frequency': {'N': str(body['frequency'])},
+                            'days': {'N': str(body['days'])},
                             'notes': {'S': body['notes']},
                             'lim': {'N': str(body['lim'])},
                             'recurring': {'BOOL': body['recurring']},
                             'num_used': {'N': str(body['num_used'])},
-                            'email_av': {'BOOL': email_av},
+                            'date_expired': {'S': exp_date},
                             'coupon_type': {'N': str(body['coupon_type'])},
                             'email_id': {'S': body['email_id']}
                     }
@@ -479,7 +496,7 @@ class Coupon(Resource):
             }
         )
         if (coupon.get('Items') == []):
-            return "Kitchen not found.", 404
+            return "Coupon not found.", 404
         return coupon, 200
     
     def put(self, coupon_id):
@@ -492,15 +509,29 @@ class Coupon(Resource):
 
         product = db.scan(TableName='coupons',
             FilterExpression='coupon_id = :val',
-            ProjectionExpression='lim, num_used',
+            ProjectionExpression='lim, num_used, date_expired, active',
             ExpressionAttributeValues={
                 ':val': {'S': coupon_id}
             })
-        
         lim1 =product["Items"][0]["lim"]["N"]
         num_used1 =product["Items"][0]["num_used"]["N"]
+        exp_date = datetime.strptime(product["Items"][0]["date_expired"]["S"], '%Y-%m-%d')
+        todays_date = datetime.now()
+        delta  = exp_date - todays_date
+
         if int(lim1)==0:
             return "Coupon depleted"
+
+        if delta.days<0 and product["Items"][0]["active"]["BOOL"]:
+            update_coupon = db.update_item(TableName='coupons',
+                Key={'coupon_id': {'S': str(coupon_id)}},
+                UpdateExpression='SET active = :ac',
+                ExpressionAttributeValues={
+                    ':ac': {'BOOL': False}
+                }
+            )
+            return "Coupon depleted"
+
         try:  
             # print(product)
             actie = True
