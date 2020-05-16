@@ -28,17 +28,17 @@ from werkzeug.security import generate_password_hash, \
 app = Flask(__name__, template_folder='assets')
 cors = CORS(app, resources={r'/api/*': {'origins': '*'}})
 
-# app.config['MAIL_USERNAME'] = os.environ.get('EMAIL')
-# app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
+app.config['MAIL_USERNAME'] = os.environ.get('EMAIL')
+app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
 # app.config['MAIL_USERNAME'] = ''
 # app.config['MAIL_PASSWORD'] = ''
 
 # Setting for mydomain.com
-# app.config['MAIL_SERVER'] = 'smtp.mydomain.com'
-# app.config['MAIL_PORT'] = 465
-# Setting for gmail
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_SERVER'] = 'smtp.mydomain.com'
 app.config['MAIL_PORT'] = 465
+# Setting for gmail
+# app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+# app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
 app.config['DEBUG'] = True
@@ -53,8 +53,8 @@ s3 = boto3.client('s3')
 
 
 # aws s3 bucket where the image is stored
-#BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
-BUCKET_NAME = 'servingnow'
+BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
+# BUCKET_NAME = 'servingnow'
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
@@ -78,7 +78,7 @@ def helper_upload_refund_img(file, bucket, key):
     if file:
         filename = 'https://s3-us-west-1.amazonaws.com/' \
                    + str(bucket) + '/' + str(key)
-        print('bucket:{}'.format(bucket))
+        #print('bucket:{}'.format(bucket))
         upload_file = s3.put_object(
                             Bucket=bucket,
                             Body=file,
@@ -129,7 +129,6 @@ class MealOrders(Resource):
         response = {}
         data = request.get_json(force=True)
         created_at = datetime.now(tz=timezone('US/Pacific')).strftime("%Y-%m-%dT%H:%M:%S")
-
         if data.get('email') == None:
             raise BadRequest('Request failed. Please provide email')
         if data.get('name') == None:
@@ -218,16 +217,16 @@ class MealOrders(Resource):
                 ProjectionExpression='kitchen_name, street, city, \
                     st, phone_number, pickup_time, first_name, kitchen_id, email'
             )
-            
+
             customerMsg = Message(subject='Order Confirmation',
-                            sender=app.config['MAIL_USERNAME'],
-                            html=render_template('emailTemplate.html',
-                            order_items=order_details,
-                            kitchen=kitchen['Item'],
-                            totalAmount=totalAmount,
-                            name=data['name']),
-                            recipients=[data['email']])
-        
+                                sender=app.config['MAIL_USERNAME'],
+                                html=render_template('emailTemplate.html',
+                                order_items=order_details,
+                                kitchen=kitchen['Item'],
+                                totalAmount=totalAmount,
+                                name=data['name']),
+                                recipients=[data['email']])
+
             prashantMsg = Message(subject='Order Confirmation',
                             sender=app.config['MAIL_USERNAME'],
                             html=render_template('emailTemplate.html',
@@ -601,7 +600,7 @@ class Refund(Resource):
                           html=render_template('refundEmailTemplate.html',
                           client_email=client_email,
                           client_message=client_message),
-                          recipients=["howardng940990575@gmail.com"]) # change it to customer service email when deploy
+                          recipients=["orders@servingnow.me"]) # change it to customer service email when deploy
             refundMsg.attach('photo.png','image/png',photo)           
             mail.send(refundMsg)
 
