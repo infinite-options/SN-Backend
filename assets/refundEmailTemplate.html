@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <style>
+ 		.card {
+ 			border:none;
+
+ 		}
+ 		.navbar {
+ 			background: #f5f5f5;
+ 		}
+
+    .name_col {
+      width: 300px;
+    }
+
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="row">
+			<div class="col">
+			</div>
+
+			<div class="col-10">
+				<nav class="navbar justify-content-center">
+					<a class="navbar-brand"><strong>Serving Now</strong></a>
+				</nav>
+
+				<br>
+
+				<h2>Hello,</h2>
+
+				<div class="card">
+					<div class="card-body">
+						<p>This is a refund request from your client {{client_email}}:</p>
+						<p>		{{client_message}}</p>
+						<p>The picture of the damaged product is attached</p>
+					</div>
+				</div>
+
+				<br>
+			</div>
+	  </div>
+	</div>
+</body>
+</html>

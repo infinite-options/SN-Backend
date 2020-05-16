@@ -28,8 +28,15 @@ from werkzeug.security import generate_password_hash, \
 app = Flask(__name__, template_folder='assets')
 cors = CORS(app, resources={r'/api/*': {'origins': '*'}})
 
-app.config['MAIL_USERNAME'] = os.environ.get('EMAIL')
-app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
+# app.config['MAIL_USERNAME'] = os.environ.get('EMAIL')
+# app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
+# app.config['MAIL_USERNAME'] = ''
+# app.config['MAIL_PASSWORD'] = ''
+
+# Setting for mydomain.com
+# app.config['MAIL_SERVER'] = 'smtp.mydomain.com'
+# app.config['MAIL_PORT'] = 465
+# Setting for gmail
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_TLS'] = False
@@ -46,8 +53,8 @@ s3 = boto3.client('s3')
 
 
 # aws s3 bucket where the image is stored
-BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
-
+#BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
+BUCKET_NAME = 'servingnow'
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
@@ -56,12 +63,28 @@ def helper_upload_meal_img(file, bucket, key):
     if file and allowed_file(file.filename):
         filename = 'https://s3-us-west-1.amazonaws.com/' \
                    + str(bucket) + '/' + str(key)
+       
         upload_file = s3.put_object(
                             Bucket=bucket,
                             Body=file,
                             Key=key,
                             ACL='public-read',
                             ContentType='image/jpeg'
+                        )
+        return filename
+    return None
+
+def helper_upload_refund_img(file, bucket, key):
+    if file:
+        filename = 'https://s3-us-west-1.amazonaws.com/' \
+                   + str(bucket) + '/' + str(key)
+        print('bucket:{}'.format(bucket))
+        upload_file = s3.put_object(
+                            Bucket=bucket,
+                            Body=file,
+                            Key=key,
+                            ACL='public-read',
+                            ContentType='image/png'
                         )
         return filename
     return None
@@ -550,7 +573,43 @@ class Coupon(Resource):
             return response, 201
         except:
             raise BadRequest('Request failed. Please try again later.')
-        
+
+class Refund(Resource):
+    def post(self):
+        response = {}
+        client_email = request.form.get('client_email')
+        client_message = request.form.get('client_message')
+        refund_id = uuid.uuid4().hex
+        if client_email == None \
+          or client_message == None:
+            raise BadRequest('Request failed. Please provide required details.')
+        try:
+            photo_key = 'refund_imgs/{}'.format(refund_id)
+            photo = request.files['product_image'].read()
+            photo_path = helper_upload_refund_img(photo, BUCKET_NAME, photo_key)
+            todays_date = datetime.now(tz=timezone('US/Pacific')).strftime("%Y-%m-%d")
+            add_meal = db.put_item(TableName='refund',
+                Item={'id': {'S': refund_id},
+                      'note': {'S': client_message},
+                      'email': {'S': client_email},
+                      'image_url': {'S': photo_path},
+                      'date':{'S':todays_date}
+                }
+            )
+            refundMsg = Message(subject='Refund Request',
+                          sender=app.config['MAIL_USERNAME'],
+                          html=render_template('refundEmailTemplate.html',
+                          client_email=client_email,
+                          client_message=client_message),
+                          recipients=["howardng940990575@gmail.com"]) # change it to customer service email when deploy
+            refundMsg.attach('photo.png','image/png',photo)           
+            mail.send(refundMsg)
+
+            response['message'] = 'Request successful'
+            return response, 200
+        except Exception as e:
+            raise BadRequest('Request failed: ' + str(e))
+
 class Kitchen(Resource):
     def get(self, kitchen_id):
         kitchen = db.scan(TableName='kitchens',
@@ -841,5 +900,6 @@ api.add_resource(Kitchen, '/api/v1/kitchen/<string:kitchen_id>')
 api.add_resource(Coupons, '/api/v1/coupons')
 api.add_resource(Coupon, '/api/v1/coupon/<string:coupon_id>')
 
+api.add_resource(Refund, '/api/v1/refund')
 if __name__ == '__main__':
     app.run(host='localhost', port='5000')
