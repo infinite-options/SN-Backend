@@ -409,7 +409,7 @@ class Coupons(Resource):
     @staticmethod
     def check_N_or_S(fi_eld):
         if 'N' in fi_eld.keys():
-            if float(fi_eld['N'])>round(float(fi_eld['N'])):
+            if float(fi_eld['N'])>int(float(fi_eld['N'])):
                 return float(fi_eld['N'])
             else:
                 return int(fi_eld['N'])
