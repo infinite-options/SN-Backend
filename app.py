@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: Japan Parikh
 # @Date:   2019-02-16 15:26:12
-# @Last Modified by:   Ranjit Marathay
-# @Last Modified time: 2019-07-04 11:38:00
+# @Last Modified by:   Howard Ng	
+# @Last Modified time: 2020-05-15 20:00:00
 
 
 import os
@@ -36,13 +36,15 @@ app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
 # Setting for mydomain.com
 app.config['MAIL_SERVER'] = 'smtp.mydomain.com'
 app.config['MAIL_PORT'] = 465
+
 # Setting for gmail
 # app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 # app.config['MAIL_PORT'] = 465
+
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
-app.config['DEBUG'] = True
-
+#app.config['DEBUG'] = True
+app.config['DEBUG'] = False
 
 mail = Mail(app)
 api = Api(app)
@@ -54,7 +56,7 @@ s3 = boto3.client('s3')
 
 # aws s3 bucket where the image is stored
 BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
-# BUCKET_NAME = 'servingnow'
+#BUCKET_NAME = 'servingnow'
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
@@ -129,6 +131,7 @@ class MealOrders(Resource):
         response = {}
         data = request.get_json(force=True)
         created_at = datetime.now(tz=timezone('US/Pacific')).strftime("%Y-%m-%dT%H:%M:%S")
+
         if data.get('email') == None:
             raise BadRequest('Request failed. Please provide email')
         if data.get('name') == None:
@@ -154,9 +157,9 @@ class MealOrders(Resource):
         if data.get('kitchen_id') == None:
             raise BadRequest('Request failed. Please provide kitchen_id')
         if data.get('delivery_instructions') == None:
-            raise BadRequest('Request failed. Please provide kitchen_id')
+            data['delivery_instructions'] = ''
         if data.get('address_unit') == None:
-            raise BadRequest('Request failed. Please provide kitchen_id')
+            data['address_unit'] = ''
 
         kitchenFound = kitchenExists(data['kitchen_id'])
 
@@ -217,17 +220,17 @@ class MealOrders(Resource):
                 ProjectionExpression='kitchen_name, street, city, \
                     st, phone_number, pickup_time, first_name, kitchen_id, email'
             )
-
-            customerMsg = Message(subject='Order Confirmation',
-                                sender=app.config['MAIL_USERNAME'],
-                                html=render_template('emailTemplate.html',
-                                order_items=order_details,
-                                kitchen=kitchen['Item'],
-                                totalAmount=totalAmount,
-                                name=data['name']),
-                                recipients=[data['email']])
-
-            prashantMsg = Message(subject='Order Confirmation',
+            
+            customerMsg = Message(subject='Serving Now: Order Confirmation',
+                            sender=app.config['MAIL_USERNAME'],
+                            html=render_template('emailTemplate.html',
+                            order_items=order_details,
+                            kitchen=kitchen['Item'],
+                            totalAmount=totalAmount,
+                            name=data['name']),
+                            recipients=[data['email'],"orders@servingnow.me"])
+        
+            prashantMsg = Message(subject='SN Admin: Order Confirmation',
                             sender=app.config['MAIL_USERNAME'],
                             html=render_template('emailTemplate.html',
                             order_items=order_details,
@@ -236,14 +239,14 @@ class MealOrders(Resource):
                             name=data['name']),
                             recipients=["pmarathay@gmail.com"])
         
-            BusinessMsg = Message(subject='Order Confirmation',
+            BusinessMsg = Message(subject='Farm Order Confirmation',
                           sender=app.config['MAIL_USERNAME'],
                           html=render_template('businessEmailTemplate.html',
                           order_items=order_details,
                           kitchen=kitchen['Item'],
                           totalAmount=totalAmount,
                           customer=data['name']),
-                          recipients=[kitchen['Item']['email']['S']])
+                          recipients=[kitchen['Item']['email']['S'],"support@servingnow.me"] )
 
             mail.send(customerMsg)
             mail.send(prashantMsg)
@@ -408,7 +411,7 @@ class Coupons(Resource):
     @staticmethod
     def check_N_or_S(fi_eld):
         if 'N' in fi_eld.keys():
-            if float(fi_eld['N'])>round(float(fi_eld['N'])):
+            if float(fi_eld['N'])>int(float(fi_eld['N'])):
                 return float(fi_eld['N'])
             else:
                 return int(fi_eld['N'])
@@ -595,12 +598,13 @@ class Refund(Resource):
                       'date':{'S':todays_date}
                 }
             )
-            refundMsg = Message(subject='Refund Request',
+            refundMsg = Message(subject='Serving Now: Refund Request',
                           sender=app.config['MAIL_USERNAME'],
                           html=render_template('refundEmailTemplate.html',
                           client_email=client_email,
                           client_message=client_message),
-                          recipients=["orders@servingnow.me"]) # change it to customer service email when deploy
+                          recipients=["support@servingnow.me"])
+                          # recipients=["howardng940990575@gmail.com"]) # change it to customer service email when deploy
             refundMsg.attach('photo.png','image/png',photo)           
             mail.send(refundMsg)
 
