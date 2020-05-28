@@ -408,6 +408,8 @@ class Kitchens(Resource):
             raise BadRequest('Request failed. Please try again later.')
 
 class Coupons(Resource):
+    bool_fields=['active','recurring']
+    num_fields = ['credit','days','lim','num_used','coupon_type']
     @staticmethod
     def check_N_or_S(fi_eld):
         if 'N' in fi_eld.keys():
@@ -417,7 +419,17 @@ class Coupons(Resource):
                 return int(fi_eld['N'])
         else:
             return fi_eld['S']
-            
+
+    def conv_str_values(self,body):
+        for key in body.keys():
+            if key in self.bool_fields:
+                body[key] = body[key]=="true"
+            elif key in self.num_fields:
+                body[key] = float(body[key])
+            else:
+                continue
+        return body
+        
     def get(self):
         """Returns all kitchens"""
         response = {}
@@ -454,20 +466,31 @@ class Coupons(Resource):
 
     def post(self):
         response = {}
+        # body = request.get_json(force=True)
         
-        body = request.get_json(force=True)
-        
+        try:
+            body = request.form.to_dict()
+            body = self.conv_str_values(body)
+        except:
+            body = request.get_json(force=True)
+        finally:
+            raise BadRequest('Request failed. Please provide form data or Json.')
+
         if body.get('credit') == None \
           or body.get('active') == None \
           or body.get('days') == None \
           or body.get('notes') == None \
           or body.get('num_used') == None \
-          or body.get('recurring') == None \
           or body.get('lim') == None \
           or body.get('coupon_type') == None:  
             raise BadRequest('Request failed. Please provide required details.')
         
-        email_av = True
+
+        if body['lim']>1:
+            body['recurring'] = True
+        else:
+            body['recurring'] = False
+        # email_av = True
         while True:
             coupon_id = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
             if couponExists(coupon_id):
@@ -476,6 +499,7 @@ class Coupons(Resource):
                 break
         
         exp_date = (datetime.now(tz=timezone('US/Pacific'))+timedelta(days=body['days'])).strftime("%Y-%m-%d")
+
         try:
             if body.get('email_id') == None:
                 add_coupon = db.put_item(TableName='coupons',
@@ -507,7 +531,7 @@ class Coupons(Resource):
                     }
                 )
 
-            response['message'] = 'Request successful'
+            response['message'] = f'Request successful with coupon id {coupon_id}'
             return response, 201
         except:
             raise BadRequest('Request failed. Please try again later.')
