@@ -473,9 +473,6 @@ class Coupons(Resource):
             body = self.conv_str_values(body)
         except:
             body = request.get_json(force=True)
-        finally:
-            raise BadRequest('Request failed. Please provide form data or Json.')
-
         if body.get('credit') == None \
           or body.get('active') == None \
           or body.get('days') == None \
