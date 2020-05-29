@@ -15,6 +15,7 @@ from datetime import timedelta
 from pytz import timezone
 import random
 import string
+import stripe
 
 from flask import Flask, request, render_template
 from flask_restful import Resource, Api
@@ -43,8 +44,10 @@ app.config['MAIL_PORT'] = 465
 
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
-#app.config['DEBUG'] = True
-app.config['DEBUG'] = False
+app.config['DEBUG'] = True
+#app.config['DEBUG'] = False
+
+app.config['STRIPE_SECRET_KEY'] = os.environ.get('STRIPE_SECRET_KEY')
 
 mail = Mail(app)
 api = Api(app)
@@ -913,7 +916,36 @@ class OrderReport(Resource):
         except:
             raise BadRequest('Request failed. please try again later.')
 
+class PaymentIntent(Resource):
+    def post(self):
+        response = {}
+        amount = request.form.get('amount')
 
+        if request.form.get('amount') == None:
+            raise BadRequest('Request failed. Please provide the amount field.')
+        try:
+            amount = int(request.form.get('amount'))
+        except:
+            raise BadRequest('Request failed. Unable to convert amount to int')
+        #print(amount)
+        #Howard's Key
+        #stripe.api_key = 'sk_test_MktxvO8JYzIzKIY4pgzl72f600Tt90V8bI'
+
+        #Live test key
+        stripe.api_key = app.config['STRIPE_SECRET_KEY']
+        intent = stripe.PaymentIntent.create(
+        amount=amount,
+        currency='usd',
+        )
+        client_secret = intent.client_secret
+        intent_id = intent.id
+        response['client_secret'] = client_secret
+        response['id'] = intent_id
+        print(response['client_secret'])
+        print(response['id'])
+        return response,200
+
+api.add_resource(PaymentIntent, '/api/v1/payment')
 api.add_resource(MealOrders, '/api/v1/orders')
 # api.add_resource(TodaysMealPhoto, '/api/v1/meal/image/upload')
 api.add_resource(RegisterKitchen, '/api/v1/kitchens/register')
