@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: Japan Parikh
 # @Date:   2019-02-16 15:26:12
-# @Last Modified by:   Ranjit Marathay
-# @Last Modified time: 2019-07-04 11:38:00
+# @Last Modified by:   Howard Ng	
+# @Last Modified time: 2020-05-15 20:00:00
 
 
 import os
@@ -15,6 +15,7 @@ from datetime import timedelta
 from pytz import timezone
 import random
 import string
+import stripe
 
 from flask import Flask, request, render_template
 from flask_restful import Resource, Api
@@ -28,21 +29,25 @@ from werkzeug.security import generate_password_hash, \
 app = Flask(__name__, template_folder='assets')
 cors = CORS(app, resources={r'/api/*': {'origins': '*'}})
 
-# app.config['MAIL_USERNAME'] = os.environ.get('EMAIL')
-# app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
+app.config['MAIL_USERNAME'] = os.environ.get('EMAIL')
+app.config['MAIL_PASSWORD'] = os.environ.get('PASSWORD')
 # app.config['MAIL_USERNAME'] = ''
 # app.config['MAIL_PASSWORD'] = ''
 
 # Setting for mydomain.com
-# app.config['MAIL_SERVER'] = 'smtp.mydomain.com'
-# app.config['MAIL_PORT'] = 465
-# Setting for gmail
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_SERVER'] = 'smtp.mydomain.com'
 app.config['MAIL_PORT'] = 465
+
+# Setting for gmail
+# app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+# app.config['MAIL_PORT'] = 465
+
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
 app.config['DEBUG'] = True
+#app.config['DEBUG'] = False
 
+app.config['STRIPE_SECRET_KEY'] = os.environ.get('STRIPE_SECRET_KEY')
 
 mail = Mail(app)
 api = Api(app)
@@ -53,8 +58,8 @@ s3 = boto3.client('s3')
 
 
 # aws s3 bucket where the image is stored
-#BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
-BUCKET_NAME = 'servingnow'
+BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
+#BUCKET_NAME = 'servingnow'
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
@@ -78,7 +83,7 @@ def helper_upload_refund_img(file, bucket, key):
     if file:
         filename = 'https://s3-us-west-1.amazonaws.com/' \
                    + str(bucket) + '/' + str(key)
-        print('bucket:{}'.format(bucket))
+        #print('bucket:{}'.format(bucket))
         upload_file = s3.put_object(
                             Bucket=bucket,
                             Body=file,
@@ -155,9 +160,9 @@ class MealOrders(Resource):
         if data.get('kitchen_id') == None:
             raise BadRequest('Request failed. Please provide kitchen_id')
         if data.get('delivery_instructions') == None:
-            raise BadRequest('Request failed. Please provide kitchen_id')
+            data['delivery_instructions'] = ''
         if data.get('address_unit') == None:
-            raise BadRequest('Request failed. Please provide kitchen_id')
+            data['address_unit'] = ''
 
         kitchenFound = kitchenExists(data['kitchen_id'])
 
@@ -219,16 +224,16 @@ class MealOrders(Resource):
                     st, phone_number, pickup_time, first_name, kitchen_id, email'
             )
             
-            customerMsg = Message(subject='Order Confirmation',
+            customerMsg = Message(subject='Serving Now: Order Confirmation',
                             sender=app.config['MAIL_USERNAME'],
                             html=render_template('emailTemplate.html',
                             order_items=order_details,
                             kitchen=kitchen['Item'],
                             totalAmount=totalAmount,
                             name=data['name']),
-                            recipients=[data['email']])
+                            recipients=[data['email'],"orders@servingnow.me"])
         
-            prashantMsg = Message(subject='Order Confirmation',
+            prashantMsg = Message(subject='SN Admin: Order Confirmation',
                             sender=app.config['MAIL_USERNAME'],
                             html=render_template('emailTemplate.html',
                             order_items=order_details,
@@ -237,14 +242,14 @@ class MealOrders(Resource):
                             name=data['name']),
                             recipients=["pmarathay@gmail.com"])
         
-            BusinessMsg = Message(subject='Order Confirmation',
+            BusinessMsg = Message(subject='Farm Order Confirmation',
                           sender=app.config['MAIL_USERNAME'],
                           html=render_template('businessEmailTemplate.html',
                           order_items=order_details,
                           kitchen=kitchen['Item'],
                           totalAmount=totalAmount,
                           customer=data['name']),
-                          recipients=[kitchen['Item']['email']['S']])
+                          recipients=[kitchen['Item']['email']['S'],"support@servingnow.me"] )
 
             mail.send(customerMsg)
             mail.send(prashantMsg)
@@ -406,6 +411,8 @@ class Kitchens(Resource):
             raise BadRequest('Request failed. Please try again later.')
 
 class Coupons(Resource):
+    bool_fields=['active','recurring']
+    num_fields = ['credit','days','lim','num_used','coupon_type']
     @staticmethod
     def check_N_or_S(fi_eld):
         if 'N' in fi_eld.keys():
@@ -415,7 +422,17 @@ class Coupons(Resource):
                 return int(fi_eld['N'])
         else:
             return fi_eld['S']
-            
+
+    def conv_str_values(self,body):
+        for key in body.keys():
+            if key in self.bool_fields:
+                body[key] = body[key]=="true"
+            elif key in self.num_fields:
+                body[key] = float(body[key])
+            else:
+                continue
+        return body
+        
     def get(self):
         """Returns all kitchens"""
         response = {}
@@ -452,19 +469,28 @@ class Coupons(Resource):
 
     def post(self):
         response = {}
+        # body = request.get_json(force=True)
         
-        body = request.get_json(force=True)
-        
+        try:
+            body = request.form.to_dict()
+            body = self.conv_str_values(body)
+        except:
+            body = request.get_json(force=True)
         if body.get('credit') == None \
           or body.get('active') == None \
           or body.get('days') == None \
           or body.get('notes') == None \
-          or body.get('recurring') == None \
+          or body.get('num_used') == None \
           or body.get('lim') == None \
           or body.get('coupon_type') == None:  
             raise BadRequest('Request failed. Please provide required details.')
         
-        #email_av = True
+
+        if body['lim']>1:
+            body['recurring'] = True
+        else:
+            body['recurring'] = False
+        # email_av = True
         while True:
             coupon_id = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
             if couponExists(coupon_id):
@@ -473,6 +499,7 @@ class Coupons(Resource):
                 break
         
         exp_date = (datetime.now(tz=timezone('US/Pacific'))+timedelta(days=body['days'])).strftime("%Y-%m-%d")
+
         try:
             if body.get('email_id') == None:
                 add_coupon = db.put_item(TableName='coupons',
@@ -504,7 +531,7 @@ class Coupons(Resource):
                     }
                 )
 
-            response['message'] = 'Request successful'
+            response['message'] = f'Request successful with coupon id {coupon_id}'
             return response, 201
         except:
             raise BadRequest('Request failed. Please try again later.')
@@ -630,12 +657,13 @@ class Refund(Resource):
                       'date':{'S':todays_date}
                 }
             )
-            refundMsg = Message(subject='Refund Request',
+            refundMsg = Message(subject='Serving Now: Refund Request',
                           sender=app.config['MAIL_USERNAME'],
                           html=render_template('refundEmailTemplate.html',
                           client_email=client_email,
                           client_message=client_message),
-                          recipients=["howardng940990575@gmail.com"]) # change it to customer service email when deploy
+                          recipients=["support@servingnow.me"])
+                          # recipients=["howardng940990575@gmail.com"]) # change it to customer service email when deploy
             refundMsg.attach('photo.png','image/png',photo)           
             mail.send(refundMsg)
 
@@ -923,7 +951,36 @@ class OrderReport(Resource):
         except:
             raise BadRequest('Request failed. please try again later.')
 
+class PaymentIntent(Resource):
+    def post(self):
+        response = {}
+        amount = request.form.get('amount')
 
+        if request.form.get('amount') == None:
+            raise BadRequest('Request failed. Please provide the amount field.')
+        try:
+            amount = int(request.form.get('amount'))
+        except:
+            raise BadRequest('Request failed. Unable to convert amount to int')
+        #print(amount)
+        #Howard's Key
+        #stripe.api_key = 'sk_test_MktxvO8JYzIzKIY4pgzl72f600Tt90V8bI'
+
+        #Live test key
+        stripe.api_key = app.config['STRIPE_SECRET_KEY']
+        intent = stripe.PaymentIntent.create(
+        amount=amount,
+        currency='usd',
+        )
+        client_secret = intent.client_secret
+        intent_id = intent.id
+        response['client_secret'] = client_secret
+        response['id'] = intent_id
+        print(response['client_secret'])
+        print(response['id'])
+        return response,200
+
+api.add_resource(PaymentIntent, '/api/v1/payment')
 api.add_resource(MealOrders, '/api/v1/orders')
 # api.add_resource(TodaysMealPhoto, '/api/v1/meal/image/upload')
 api.add_resource(RegisterKitchen, '/api/v1/kitchens/register')
