@@ -510,7 +510,7 @@ class Coupons(Resource):
                             'notes': {'S': body['notes']},
                             'lim': {'N': str(body['lim'])},
                             'recurring': {'BOOL': body['recurring']},
-                            'num_used': {'N': str(body['num_used'])},
+                            'num_used': {'N': str(0)},
                             'date_expired': {'S': exp_date},
                             'coupon_type': {'N': str(body['coupon_type'])}
                     }
@@ -524,7 +524,7 @@ class Coupons(Resource):
                             'notes': {'S': body['notes']},
                             'lim': {'N': str(body['lim'])},
                             'recurring': {'BOOL': body['recurring']},
-                            'num_used': {'N': str(body['num_used'])},
+                            'num_used': {'N': str(0)},
                             'date_expired': {'S': exp_date},
                             'coupon_type': {'N': str(body['coupon_type'])},
                             'email_id': {'S': body['email_id']}
@@ -597,6 +597,41 @@ class Coupon(Resource):
             )
             response['message'] = 'Request successful'
             return response, 201
+        except:
+            raise BadRequest('Request failed. Please try again later.')
+
+class ZipCodes(Resource):
+    def get(self):
+        """Returns all Zipcodes"""
+        response = {}
+        try:
+            lis_zip_codes =["94024",
+                    "94087",
+                    "95014",
+                    "95030",
+                    "95032",
+                    "95051",
+                    "95070",
+                    "95111",
+                    "95112",
+                    "95120",
+                    "95123",
+                    "95124",
+                    "95125",
+                    "95129",
+                    "95130",
+                    "95128",
+                    "95122",
+                    "95118",
+                    "95126",
+                    "95136",
+                    "95113",
+                    "95117"]
+            result = {}
+            result['zipcodes'] = lis_zip_codes
+            response['message'] = 'Request successful'
+            response['result'] = result
+            return response, 200
         except:
             raise BadRequest('Request failed. Please try again later.')
 
@@ -957,5 +992,7 @@ api.add_resource(Coupons, '/api/v1/coupons')
 api.add_resource(Coupon, '/api/v1/coupon/<string:coupon_id>')
 
 api.add_resource(Refund, '/api/v1/refund')
+
+api.add_resource(ZipCodes, '/api/v1/zipcodes')
 if __name__ == '__main__':
     app.run(host='localhost', port='5000')
