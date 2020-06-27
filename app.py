@@ -924,6 +924,29 @@ class PaymentIntent(Resource):
         print(response['id'])
         return response,200
 
+class Orders(Resource):
+    def get(self):
+        orders = db.scan(AttributesToGet=["email", "phone", "name", "zipCode", "created_at"] ,TableName="meal_orders")
+        customer_dict = {}
+        for order in orders["Items"]:
+            if order['email']['S'] in customer_dict:
+                order['last_order_date'] = customer_dict[order['email']['S']]
+            else:
+                last_order_date = db.scan(TableName="meal_orders",
+                FilterExpression='email = :email',
+                ExpressionAttributeValues={
+                    ':email': {'S': order['email']['S']}
+                })
+                seq = [x['created_at']['S'] for x in last_order_date['Items']]
+                last_order_date = max(seq)
+                customer_dict[order['email']['S']] = last_order_date
+                order['last_order_date'] = {'S':last_order_date}
+                # customer_dict[order['email']['S']] = last_order_date['Items'][0]['created_at']['S']
+                # order['last_order_date'] = {'S':last_order_date['Items'][0]['created_at']['S']}
+                # return order
+        return orders,200
+
+api.add_resource(Orders, '/api/v1/all_orders')
 api.add_resource(PaymentIntent, '/api/v1/payment')
 api.add_resource(MealOrders, '/api/v1/orders')
 # api.add_resource(TodaysMealPhoto, '/api/v1/meal/image/upload')
