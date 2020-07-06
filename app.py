@@ -26,6 +26,11 @@ from werkzeug.exceptions import BadRequest, NotFound
 from werkzeug.security import generate_password_hash, \
      check_password_hash
 
+from NotificationHub import Notification
+from NotificationHub import NotificationHub
+import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
+
 app = Flask(__name__, template_folder='assets')
 cors = CORS(app, resources={r'/api/*': {'origins': '*'}})
 
@@ -63,6 +68,12 @@ BUCKET_NAME = os.environ.get('MEAL_IMAGES_BUCKET')
 # allowed extensions for uploading a profile photo file
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
+# For Push notification
+isDebug = False
+NOTIFICATION_HUB_KEY = os.environ.get('NOTIFICATION_HUB_KEY')
+NOTIFICATION_HUB_NAME = os.environ.get('NOTIFICATION_HUB_NAME')
+
+hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
 
 def helper_upload_meal_img(file, bucket, key):
     if file and allowed_file(file.filename):
@@ -986,7 +997,8 @@ class Orders(Resource):
         customer_dict = {}
         for order in orders["Items"]:
             if order['email']['S'] in customer_dict:
-                order['last_order_date'] = customer_dict[order['email']['S']]
+                order['last_order_date'] = {'S':customer_dict[order['email']['S']][0]}
+                order['number_of_orders'] = {'S':customer_dict[order['email']['S']][1]}
             else:
                 last_order_date = db.scan(TableName="meal_orders",
                 FilterExpression='email = :email',
@@ -995,13 +1007,132 @@ class Orders(Resource):
                 })
                 seq = [x['created_at']['S'] for x in last_order_date['Items']]
                 last_order_date = max(seq)
-                customer_dict[order['email']['S']] = last_order_date
+                number_of_orders = len(seq)
+                customer_dict[order['email']['S']] = [last_order_date,number_of_orders]
                 order['last_order_date'] = {'S':last_order_date}
+                order['number_of_orders'] = {'S':number_of_orders}
                 # customer_dict[order['email']['S']] = last_order_date['Items'][0]['created_at']['S']
                 # order['last_order_date'] = {'S':last_order_date['Items'][0]['created_at']['S']}
                 # return order
         return orders,200
 
+class Send_Notification(Resource):
+    def post(self):
+        tags = request.form.get('tags')
+        message = request.form.get('message')
+        
+        if tags is None:
+            raise BadRequest('Request failed. Please provide the tag field.')
+        if message is None:
+            raise BadRequest('Request failed. Please provide the message field.')
+        tags = tags.split(',')
+        for tag in tags:
+            alert_payload = {
+                "aps" : { 
+                    "alert" : message, 
+                }, 
+            }
+            # hub.send_apple_notification(alert_payload, tags = "default")
+            hub.send_apple_notification(alert_payload, tags = tag)
+            fcm_payload = {
+                "data":{"message": message}
+            }
+            # hub.send_gcm_notification(fcm_payload, tags = "default")
+            hub.send_gcm_notification(fcm_payload, tags = tag)
+        return 200
+
+class Get_Registrations_From_Tag(Resource):
+    def get(self, tag):
+        if tag is None:
+            raise BadRequest('Request failed. Please provide the tag field.')
+        response = hub.get_all_registrations_with_a_tag(tag)
+        response = str(response.read())
+        print(response)
+        return response,200
+
+class Create_or_Update_Registration_iOS(Resource):
+    def post(self):
+        registration_id = request.form.get('registration_id')
+        device_token = request.form.get('device_token')
+        tags = request.form.get('tags')
+        
+        if tags is None:
+            raise BadRequest('Request failed. Please provide the tags field.')
+        if registration_id is None:
+            raise BadRequest('Request failed. Please provide the registration_id field.')
+        if device_token is None:
+            raise BadRequest('Request failed. Please provide the device_token field.')
+
+        response = hub.create_or_update_registration_iOS(registration_id, device_token, tags)
+
+        return response.status
+
+class Update_Registration_With_GUID_iOS(Resource):
+    def post(self):
+        guid = request.form.get('guid')
+        tags = request.form.get('tags')
+        if guid is None:
+            raise BadRequest('Request failed. Please provide the guid field.')
+        if tags is None:
+            raise BadRequest('Request failed. Please provide the tags field.')
+        response = hub.get_all_registrations_with_a_tag(guid)
+        xml_response = str(response.read())[2:-1]
+        # root = ET.fromstring(xml_response)
+        xml_response_soup = BeautifulSoup(xml_response,features="html.parser")
+        appleregistrationdescription = xml_response_soup.feed.entry.content.appleregistrationdescription
+        registration_id = appleregistrationdescription.registrationid.get_text()
+        device_token = appleregistrationdescription.devicetoken.get_text()
+        old_tags = appleregistrationdescription.tags.get_text().split(",")
+        tags = tags.split(",")
+        new_tags = set(old_tags + tags)
+        new_tags = ','.join(new_tags)
+        print(f"tags: {old_tags}\ndevice_token: {device_token}\nregistration_id: {registration_id}")
+        
+        if device_token is None or registration_id is None:
+            raise BadRequest('Something went wrong in retriving device_token and registration_id')
+        
+        response = hub.create_or_update_registration_iOS(registration_id, device_token, new_tags)
+        # for type_tag in root.findall('feed/entry/content/AppleRegistrationDescription'):
+        #     value = type_tag.get('Tags')
+        #     print(value)
+        # print("\n\n--- RESPONSE ---")
+        # print(str(response.status) + " " + response.reason)
+        # print(response.msg)
+        # print(response.read())
+        # print("--- END RESPONSE ---")
+        return response.status
+
+class Update_Registration_With_GUID_Android(Resource):
+    def post(self):
+        guid = request.form.get('guid')
+        tags = request.form.get('tags')
+        if guid is None:
+            raise BadRequest('Request failed. Please provide the guid field.')
+        if tags is None:
+            raise BadRequest('Request failed. Please provide the tags field.')
+        response = hub.get_all_registrations_with_a_tag(guid)
+        xml_response = str(response.read())[2:-1]
+        # root = ET.fromstring(xml_response)
+        xml_response_soup = BeautifulSoup(xml_response,features="html.parser")
+        gcmregistrationdescription = xml_response_soup.feed.entry.content.gcmregistrationdescription
+        registration_id = gcmregistrationdescription.registrationid.get_text()
+        gcm_registration_id = gcmregistrationdescription.gcmregistrationid.get_text()
+        old_tags = gcmregistrationdescription.tags.get_text().split(",")
+        tags = tags.split(",")
+        new_tags = set(old_tags + tags)
+        new_tags = ','.join(new_tags)
+        print(f"tags: {old_tags}\nregistration_id: {registration_id}\ngcm_registration_id: {gcm_registration_id}")
+        
+        if gcm_registration_id is None or registration_id is None:
+            raise BadRequest('Something went wrong in retriving gcm_registration_id and registration_id')
+        
+        response = hub.create_or_update_registration_android(registration_id, gcm_registration_id, new_tags)
+        return response.status
+
+api.add_resource(Update_Registration_With_GUID_Android, '/api/v1/update_registration_guid_android')        
+api.add_resource(Update_Registration_With_GUID_iOS, '/api/v1/update_registration_guid_iOS')
+api.add_resource(Get_Registrations_From_Tag, '/api/v1/get_registraions/<string:tag>')
+api.add_resource(Send_Notification, '/api/v1/send_notification')
 api.add_resource(Orders, '/api/v1/all_orders')
 api.add_resource(PaymentIntent, '/api/v1/payment')
 api.add_resource(MealOrders, '/api/v1/orders')
