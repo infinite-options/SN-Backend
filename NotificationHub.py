@@ -261,10 +261,10 @@ class NotificationHub:
 
 
 
-isDebug = True
-hub = NotificationHub("Endpoint=sb://serving-now-notifications-namespace.servicebus.windows.net/;SharedAccessKeyName=DefaultFullSharedAccessSignature;SharedAccessKey=52/qoOQFkz7uoIObIBSnw0P9y5cWzPo9FZ2IsbV36To=", "Serving-Now-Notifications", isDebug)
+
+
 #hub.create_or_update_registration('7678985146758001737-6189004290585846588-1','E7F2BFA9E2EA84AC2AA6C057F1E16804CEAD7C5C7812402A76EB28020B8D42C9','default,ios,howard')
-hub.get_all_registrations_with_a_tag('guid_2bfd6f49-dc53-4ece-b38d-1ba729f7ec4c')
+#hub.get_all_registrations_with_a_tag('guid_2bfd6f49-dc53-4ece-b38d-1ba729f7ec4c')
 #hub.create_or_update_registration('7587903074845162734-3021491851548156642-3','E7F2BFA9E2EA84AC2AA6C057F1E16804CEAD7C5C7812402A76EB28020B8D42C9','som')
 #wns_payload = """<toast><visual><binding template=\"ToastText01\"><text id=\"1\">Python Test</text></binding></visual></toast>"""
 #hub.send_windows_notification(wns_payload)
