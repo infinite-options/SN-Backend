@@ -73,8 +73,6 @@ isDebug = False
 NOTIFICATION_HUB_KEY = os.environ.get('NOTIFICATION_HUB_KEY')
 NOTIFICATION_HUB_NAME = os.environ.get('NOTIFICATION_HUB_NAME')
 
-hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
-
 def helper_upload_meal_img(file, bucket, key):
     if file and allowed_file(file.filename):
         filename = 'https://s3-us-west-1.amazonaws.com/' \
@@ -225,7 +223,8 @@ class MealOrders(Resource):
                       'phone': {'S': str(data['phone'])},
                       'delivery_instructions' : {'S': data['delivery_instructions']},
                       'address_unit' : {'S': data['address_unit']},
-                      'kitchen_id': {'S': str(data['kitchen_id'])}
+                      'kitchen_id': {'S': str(data['kitchen_id'])},
+                      'notification_enabled': {'BOOL': data['notification_enabled']}
                 }
             )
 
@@ -1018,6 +1017,7 @@ class Orders(Resource):
 
 class Send_Notification(Resource):
     def post(self):
+        hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
         tags = request.form.get('tags')
         message = request.form.get('message')
         
@@ -1043,6 +1043,7 @@ class Send_Notification(Resource):
 
 class Get_Registrations_From_Tag(Resource):
     def get(self, tag):
+        hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
         if tag is None:
             raise BadRequest('Request failed. Please provide the tag field.')
         response = hub.get_all_registrations_with_a_tag(tag)
@@ -1052,6 +1053,7 @@ class Get_Registrations_From_Tag(Resource):
 
 class Create_or_Update_Registration_iOS(Resource):
     def post(self):
+        hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
         registration_id = request.form.get('registration_id')
         device_token = request.form.get('device_token')
         tags = request.form.get('tags')
@@ -1069,6 +1071,7 @@ class Create_or_Update_Registration_iOS(Resource):
 
 class Update_Registration_With_GUID_iOS(Resource):
     def post(self):
+        hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
         guid = request.form.get('guid')
         tags = request.form.get('tags')
         if guid is None:
@@ -1104,6 +1107,7 @@ class Update_Registration_With_GUID_iOS(Resource):
 
 class Update_Registration_With_GUID_Android(Resource):
     def post(self):
+        hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
         guid = request.form.get('guid')
         tags = request.form.get('tags')
         if guid is None:
