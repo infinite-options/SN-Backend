@@ -938,7 +938,15 @@ class PaymentIntent(Resource):
 
 class Orders(Resource):
     def get(self):
-        orders = db.scan(AttributesToGet=["email", "phone", "name", "zipCode", "created_at"] ,TableName="meal_orders")
+                # orders = db.scan(AttributesToGet=["email", "phone", "name", "zipCode", "created_at"], 
+                #         FilterExpression='notification_enabled == :value',
+                #         ExpressionAttributeValues={':value': {'BOOL': True}},
+                #         TableName="meal_orders")
+        orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at",
+                            FilterExpression='notification_enabled = :value',
+                            ExpressionAttributeValues={':value': {'BOOL': True}},
+                            ExpressionAttributeNames = {'#full_name': 'name'},
+                            TableName="meal_orders")
         customer_dict = {}
         for order in orders["Items"]:
             if order['email']['S'] in customer_dict:
