@@ -172,6 +172,8 @@ class MealOrders(Resource):
             data['delivery_instructions'] = ''
         if data.get('address_unit') == None:
             data['address_unit'] = ''
+        if data.get('notification_enabled') == None:
+            data['notification_enabled'] = False
 
         kitchenFound = kitchenExists(data['kitchen_id'])
 
