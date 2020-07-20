@@ -174,6 +174,12 @@ class MealOrders(Resource):
             data['address_unit'] = ''
         if data.get('notification_enabled') == None:
             data['notification_enabled'] = False
+        if data.get('addressLongitude') == None:
+            data['addressLongitude'] = '0'
+        if data.get('addressLatitude') == None:
+            data['addressLatitude'] = '0'
+        if data.get('appVersion') == None:
+            data['appVersion'] = '<=1.6'
 
         kitchenFound = kitchenExists(data['kitchen_id'])
 
@@ -226,7 +232,10 @@ class MealOrders(Resource):
                       'delivery_instructions' : {'S': data['delivery_instructions']},
                       'address_unit' : {'S': data['address_unit']},
                       'kitchen_id': {'S': str(data['kitchen_id'])},
-                      'notification_enabled': {'BOOL': data['notification_enabled']}
+                      'notification_enabled': {'BOOL': data['notification_enabled']},
+                      'addressLongitude' : {'S': data['addressLongitude']},
+                      'addressLatitude' : {'S': data['addressLatitude']},
+                      'appVersion' : {'S': data['appVersion']}
                 }
             )
 
@@ -402,7 +411,7 @@ class Kitchens(Resource):
                 ProjectionExpression='kitchen_name, kitchen_id, \
                     close_time, description, open_time, isOpen, \
                     accepting_hours, is_accepting_24hr, delivery_hours, \
-                    zipcode',
+                    zipcode, available_zipcode',
             )
 
             result = []
@@ -639,6 +648,7 @@ class ZipCodes(Resource):
                     "95136",
                     "95113",
                     "95117"]
+                    #"94024,94087,95014,95030,95032,95051,95070,95111,95112,95120,95123,95124,95125,95129,95130,95128,95122,95118,95126,95136,95113,95117"
             result = {}
             result['zipcodes'] = lis_zip_codes
             response['message'] = 'Request successful'
@@ -998,7 +1008,7 @@ class Orders(Resource):
                 #         FilterExpression='notification_enabled == :value',
                 #         ExpressionAttributeValues={':value': {'BOOL': True}},
                 #         TableName="meal_orders")
-        orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at",
+        orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at,city,street,kitchen_id",
                             FilterExpression='notification_enabled = :value',
                             ExpressionAttributeValues={':value': {'BOOL': True}},
                             ExpressionAttributeNames = {'#full_name': 'name'},
@@ -1079,6 +1089,23 @@ class Create_or_Update_Registration_iOS(Resource):
 
         return response.status
 
+class Get_Tags_With_GUID_iOS(Resource):
+    def get(self, tag):
+        hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
+        guid = tag
+        if guid is None:
+            raise BadRequest('Request failed. Please provide the guid field.')
+        response = hub.get_all_registrations_with_a_tag(guid)
+        print(response)
+        xml_response = str(response.read())[2:-1]
+        # root = ET.fromstring(xml_response)
+        xml_response_soup = BeautifulSoup(xml_response,features="html.parser")
+        appleregistrationdescription = xml_response_soup.feed.entry.content.appleregistrationdescription
+        registration_id = appleregistrationdescription.registrationid.get_text()
+        device_token = appleregistrationdescription.devicetoken.get_text()
+        old_tags = appleregistrationdescription.tags.get_text().split(",")
+        return old_tags
+
 class Update_Registration_With_GUID_iOS(Resource):
     def post(self):
         hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
@@ -1143,6 +1170,7 @@ class Update_Registration_With_GUID_Android(Resource):
         response = hub.create_or_update_registration_android(registration_id, gcm_registration_id, new_tags)
         return response.status
 
+api.add_resource(Get_Tags_With_GUID_iOS, '/api/v1/get_tags_with_guid_iOS/<string:tag>')
 api.add_resource(Update_Registration_With_GUID_Android, '/api/v1/update_registration_guid_android')        
 api.add_resource(Update_Registration_With_GUID_iOS, '/api/v1/update_registration_guid_iOS')
 api.add_resource(Get_Registrations_From_Tag, '/api/v1/get_registraions/<string:tag>')
