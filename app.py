@@ -1008,7 +1008,7 @@ class Orders(Resource):
                 #         FilterExpression='notification_enabled == :value',
                 #         ExpressionAttributeValues={':value': {'BOOL': True}},
                 #         TableName="meal_orders")
-        orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at,city,street,kitchen_id",
+        orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at,city,street,kitchen_id,order_id",
                             FilterExpression='notification_enabled = :value',
                             ExpressionAttributeValues={':value': {'BOOL': True}},
                             ExpressionAttributeNames = {'#full_name': 'name'},
@@ -1035,6 +1035,180 @@ class Orders(Resource):
                 # return order
         return orders,200
 
+class SMS_Orders(Resource):
+    def get(self):
+                # orders = db.scan(AttributesToGet=["email", "phone", "name", "zipCode", "created_at"], 
+                #         FilterExpression='notification_enabled == :value',
+                #         ExpressionAttributeValues={':value': {'BOOL': True}},
+                #         TableName="meal_orders")
+        orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at,city,street,kitchen_id,order_id",
+                            FilterExpression='notification_enabled = :value',
+                            ExpressionAttributeValues={':value': {'BOOL': False}},
+                            ExpressionAttributeNames = {'#full_name': 'name'},
+                            TableName="meal_orders")
+        customer_dict = {}
+        for order in orders["Items"]:
+            if order['email']['S'] in customer_dict:
+                order['last_order_date'] = {'S':customer_dict[order['email']['S']][0]}
+                order['number_of_orders'] = {'S':customer_dict[order['email']['S']][1]}
+                order['ever_enabled_notification'] = {'S':customer_dict[order['email']['S']][2]}
+            else:
+                all_order_date = db.scan(TableName="meal_orders",
+                FilterExpression='email = :email',
+                ExpressionAttributeValues={
+                    ':email': {'S': order['email']['S']}
+                })
+                seq = [x['created_at']['S'] for x in all_order_date['Items']]
+                last_order_date = max(seq)
+                number_of_orders = len(seq)
+
+                ever_enabled_notification = False
+                for last_order in all_order_date['Items']:
+                    if 'notification_enabled' in last_order and last_order['notification_enabled']['BOOL']:
+                        ever_enabled_notification = True
+
+                customer_dict[order['email']['S']] = [last_order_date,number_of_orders,ever_enabled_notification]
+                order['last_order_date'] = {'S':last_order_date}
+                order['number_of_orders'] = {'S':number_of_orders}
+                order['ever_enabled_notification'] = {'S':ever_enabled_notification}
+        unique_customer = set()
+        new_orders_items = []
+        for order in orders["Items"]:
+            if order['phone']['S'] not in unique_customer and order['ever_enabled_notification']['S'] is False:
+                new_orders_items.append(order)
+                unique_customer.add(order['phone']['S'])
+        orders["Items"] = new_orders_items
+        return orders,200
+class Saved_Nofitication_Message(Resource):
+    def put(self):
+        message_name = request.form.get('message_name')
+        message_payload = request.form.get('message_payload')
+        if message_name is None \
+          or message_payload is None:
+            raise BadRequest('Request failed. Please provide required details.')
+
+        message_id = uuid.uuid4().hex
+        created_date = datetime.now(tz=timezone('US/Pacific')).strftime("%Y-%m-%dT%H:%M:%S")
+        add_message = db.put_item(TableName='saved_notification_message',
+                Item={'message_id': {'S': message_id},
+                      'created_date': {'S': created_date},
+                      'message_name': {'S': message_name},
+                      'message_payload': {'S': message_payload}
+                }
+            )
+        return 200
+
+    def post(self):
+        message_id = request.form.get('message_id')
+        message_name = request.form.get('message_name')
+        message_payload = request.form.get('message_payload')
+        if message_id is None \
+            or message_name is None \
+            or message_payload is None:
+            raise BadRequest('Request failed. Please provide required details.')
+            
+        message = db.scan(TableName='saved_notification_message',
+            FilterExpression='message_id = :val',
+            ExpressionAttributeValues={
+                ':val': {'S': message_id}
+            }
+        )
+        if message['Count'] is 0:
+            raise BadRequest('message_id not match.')
+
+        message = db.update_item(TableName='saved_notification_message',
+                Key={'message_id': {'S': message_id}},
+                UpdateExpression='SET message_name = :message_name_val, message_payload = :message_payload_val',
+                ExpressionAttributeValues={
+                    ':message_name_val': {'S': message_name},
+                    ':message_payload_val': {'S': message_payload}
+                })
+        return 200
+
+    def get(self):
+        messages = db.scan(TableName="saved_notification_message")
+        return messages
+
+class Delete_Saved_Nofitication_Message(Resource): 
+    def post(self):
+        message_id = request.form.get('message_id')
+        if message_id is None:
+            raise BadRequest('message_id is required')
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('saved_notification_message')
+        table.delete_item(
+            Key={
+                'message_id': message_id
+            }
+        )
+        return 200
+
+class Saved_Nofitication_Group(Resource): 
+    def put(self):
+        #data = {"group_name": "Test", "customers": [{'S':'02e9e8ca47274617b10f548538d427ad'},{'S':'02e9e8ca47274617b10test'}]}  
+        data = request.get_json(force=True)
+        if 'group_name' not in data:
+            raise BadRequest('Missing group_name.')
+        if 'customers' not in data:
+            raise BadRequest('Missing customers.')
+        group_id = uuid.uuid4().hex
+        created_date = datetime.now(tz=timezone('US/Pacific')).strftime("%Y-%m-%dT%H:%M:%S")
+        add_group = db.put_item(TableName='saved_notification_group',
+                Item={'group_id': {'S': group_id},
+                      'created_date': {'S': created_date},
+                      'group_name': {'S': data['group_name']},
+                      'customers': {'L': data['customers']}
+                }
+            )
+        return 200
+
+    def post(self):
+        # data = {"group_id":"33235e1ed26e423ca549fdd04ea8e357",
+        #         "group_name": "Test",
+        #         "customers": [{'S':'02e9e8ca47274617b10f548538d427ad'},{'S':'02e9e8ca47274617b10test'},{'S':'one more'}]}  
+        data = request.get_json(force=True)
+        if 'group_id' not in data:
+            raise BadRequest('Missing group_id.')
+        if 'group_name' not in data:
+            raise BadRequest('Missing group_name.')
+        if 'customers' not in data:
+            raise BadRequest('Missing customers.')
+
+        group = db.scan(TableName='saved_notification_group',
+            FilterExpression='group_id = :val',
+            ExpressionAttributeValues={
+                ':val': {'S': data['group_id']}
+            }
+        )
+        if group['Count'] is 0:
+            raise BadRequest('group_id not match.')
+        
+        group = db.update_item(TableName='saved_notification_group',
+                Key={'group_id': {'S': data['group_id']}},
+                UpdateExpression='SET group_name = :group_name_val, customers = :customers_val',
+                ExpressionAttributeValues={
+                    ':group_name_val': {'S': data['group_name']},
+                    ':customers_val': {'L': data['customers']}
+                })    
+        return 200
+
+    def get(self):
+        groups = db.scan(TableName="saved_notification_group")
+        return groups
+
+class Delete_Saved_Nofitication_Group(Resource): 
+    def post(self):
+        group_id = request.form.get('group_id')
+        if group_id is None:
+            raise BadRequest('group_id is required')
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('saved_notification_group')
+        table.delete_item(
+            Key={
+                'group_id': group_id
+            }
+        )
+        return 200
 class Send_Notification(Resource):
     def post(self):
         hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
@@ -1170,12 +1344,17 @@ class Update_Registration_With_GUID_Android(Resource):
         response = hub.create_or_update_registration_android(registration_id, gcm_registration_id, new_tags)
         return response.status
 
+api.add_resource(Delete_Saved_Nofitication_Group, '/api/v1/delete_saved_notification_group')
+api.add_resource(Delete_Saved_Nofitication_Message, '/api/v1/delete_saved_notification_message')
+api.add_resource(Saved_Nofitication_Group, '/api/v1/saved_notification_group')
+api.add_resource(Saved_Nofitication_Message, '/api/v1/saved_notification_message')
 api.add_resource(Get_Tags_With_GUID_iOS, '/api/v1/get_tags_with_guid_iOS/<string:tag>')
 api.add_resource(Update_Registration_With_GUID_Android, '/api/v1/update_registration_guid_android')        
 api.add_resource(Update_Registration_With_GUID_iOS, '/api/v1/update_registration_guid_iOS')
 api.add_resource(Get_Registrations_From_Tag, '/api/v1/get_registraions/<string:tag>')
 api.add_resource(Send_Notification, '/api/v1/send_notification')
 api.add_resource(Orders, '/api/v1/all_orders')
+api.add_resource(SMS_Orders, '/api/v1/sms_all_orders')
 api.add_resource(PaymentIntent, '/api/v1/payment')
 api.add_resource(MealOrders, '/api/v1/orders')
 # api.add_resource(TodaysMealPhoto, '/api/v1/meal/image/upload')
