@@ -76,7 +76,7 @@ NOTIFICATION_HUB_NAME = os.environ.get('NOTIFICATION_HUB_NAME')
 
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
-sms_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+#sms_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 def helper_upload_meal_img(file, bucket, key):
     if file and allowed_file(file.filename):
@@ -1249,6 +1249,7 @@ class Send_Notification(Resource):
 
 class Send_Twilio_SMS(Resource):
     def post(self):
+        sms_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
         recipients = request.form.get('recipients')
         message = request.form.get('message')
         if not recipients:
