@@ -11,3 +11,4 @@ Flask-Mail
 pytz
 boto3
 awscli
+twilio
