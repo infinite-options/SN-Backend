@@ -1046,6 +1046,13 @@ class SMS_Orders(Resource):
                             ExpressionAttributeValues={':value': {'BOOL': False}},
                             ExpressionAttributeNames = {'#full_name': 'name'},
                             TableName="meal_orders")
+        none_orders = db.scan(ProjectionExpression="email,phone,#full_name,zipCode,created_at,city,street,kitchen_id,order_id",
+                            FilterExpression='attribute_not_exists(notification_enabled)',
+                            ExpressionAttributeNames = {'#full_name': 'name'},
+                            TableName="meal_orders")    
+
+        orders["Items"] = orders["Items"] + none_orders["Items"]
+
         customer_dict = {}
         for order in orders["Items"]:
             if order['email']['S'] in customer_dict:
