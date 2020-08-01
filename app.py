@@ -30,6 +30,7 @@ from NotificationHub import Notification
 from NotificationHub import NotificationHub
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
+from twilio.rest import Client
 
 app = Flask(__name__, template_folder='assets')
 cors = CORS(app, resources={r'/api/*': {'origins': '*'}})
@@ -72,6 +73,10 @@ ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 isDebug = False
 NOTIFICATION_HUB_KEY = os.environ.get('NOTIFICATION_HUB_KEY')
 NOTIFICATION_HUB_NAME = os.environ.get('NOTIFICATION_HUB_NAME')
+
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+sms_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 def helper_upload_meal_img(file, bucket, key):
     if file and allowed_file(file.filename):
@@ -1242,6 +1247,22 @@ class Send_Notification(Resource):
             hub.send_gcm_notification(fcm_payload, tags = tag)
         return 200
 
+class Send_Twilio_SMS(Resource):
+    def post(self):
+        recipients = request.form.get('recipients')
+        message = request.form.get('message')
+        if not recipients:
+            raise BadRequest('Request failed. Please provide the recipients field.')
+        if not message:
+            raise BadRequest('Request failed. Please provide the message field.')
+        for destination in recipients.split(','):
+            sms_client.messages.create(
+                body=message,
+                from_='+19254815757',
+                to=destination
+            )
+        return 200
+
 class Get_Registrations_From_Tag(Resource):
     def get(self, tag):
         hub = NotificationHub(NOTIFICATION_HUB_KEY, NOTIFICATION_HUB_NAME, isDebug)
@@ -1360,6 +1381,7 @@ api.add_resource(Update_Registration_With_GUID_Android, '/api/v1/update_registra
 api.add_resource(Update_Registration_With_GUID_iOS, '/api/v1/update_registration_guid_iOS')
 api.add_resource(Get_Registrations_From_Tag, '/api/v1/get_registraions/<string:tag>')
 api.add_resource(Send_Notification, '/api/v1/send_notification')
+api.add_resource(Send_Twilio_SMS, '/api/v1/send_twilio_sms')
 api.add_resource(Orders, '/api/v1/all_orders')
 api.add_resource(SMS_Orders, '/api/v1/sms_all_orders')
 api.add_resource(PaymentIntent, '/api/v1/payment')
