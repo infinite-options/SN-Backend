@@ -412,7 +412,7 @@ class MealOrders(Resource):
                                 )
                                 VALUES
                                 (
-                                    \'""" + "test137" + """\',
+                                    \'""" + order_id + """\',
                                     \'""" + created_at + """\',
                                     \'""" + data['email'] + """\',
                                     \'""" + data['name'] + """\',
@@ -421,7 +421,7 @@ class MealOrders(Resource):
                                     \'""" + data['city'] + """\',
                                     \'""" + data['state'] + """\',
                                     \'""" + str(totalAmount) + """\',
-                                    \'""" + str(data['paid']) + """\',
+                                    0,
                                     \'""" + 'open' + """\',
                                     \'""" + data['paymentType'] + """\',
                                     \'""" + json.dumps(order_items) + """\',
@@ -429,7 +429,7 @@ class MealOrders(Resource):
                                     \'""" + data['delivery_instructions'] + """\',
                                     \'""" + data['address_unit'] + """\',
                                     \'""" + str(data['kitchen_id']) + """\',
-                                    \'""" + str(data['notification_enabled']) + """\',
+                                    0,
                                     \'""" + data['addressLongitude'] + """\',
                                     \'""" + data['addressLatitude'] + """\',
                                     \'""" + data['appVersion'] + """\');""";
@@ -437,7 +437,9 @@ class MealOrders(Resource):
             add_order = execute(query, 'post', conn, skipSerialization=False)
             print(add_order)
                
-            return      
+            return
+            #Above is working
+            #Need to convert everything below as well.      
             kitchen = db.get_item(TableName='kitchens',
                 Key={'kitchen_id': {'S': data['kitchen_id']}},
                 ProjectionExpression='kitchen_name, street, city, \
