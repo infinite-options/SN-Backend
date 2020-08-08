@@ -33,6 +33,15 @@ from bs4 import BeautifulSoup
 from twilio.rest import Client
 
 import pymysql
+from decimal import Decimal
+from datetime import datetime, date, timedelta
+
+from decimal import Decimal
+
+def default(obj):
+    if isinstance(obj, Decimal):
+        return str(obj)
+    raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
 
 app = Flask(__name__, template_folder='assets')
 cors = CORS(app, resources={r'/api/*': {'origins': '*'}})
@@ -141,18 +150,19 @@ def execute(sql, cmd, conn, skipSerialization=False):
     response = {}
     try:
         with conn.cursor() as cur:
+            if cmd == 'post':
+                print("before")
             cur.execute(sql)
+            if cmd == 'post':
+                print("executed")
             if cmd == 'get':
                 result = cur.fetchall()
                 response['message'] = 'Successfully executed SQL query.'
-                print(response)
                 # Return status code of 280 for successful GET request
                 response['code'] = 280
-                print(response)
                 if not skipSerialization:
                     result = serializeResponse(result)
                 response['result'] = result
-                print(response)
             elif cmd == 'post':
                 conn.commit()
                 response['message'] = 'Successfully committed SQL command.'
@@ -247,7 +257,7 @@ class MealOrders(Resource):
         response = {}
         data = request.get_json(force=True)
         created_at = datetime.now(tz=timezone('US/Pacific')).strftime("%Y-%m-%dT%H:%M:%S")
-
+        print(data)
         if data.get('email') == None:
             raise BadRequest('Request failed. Please provide email')
         if data.get('name') == None:
@@ -295,54 +305,153 @@ class MealOrders(Resource):
         totalAmount = data['totalAmount']
 
         order_details = []
-
+        conn = connect()
         for i in data['ordered_items']:
-            product = db.scan(TableName='meals',
-                FilterExpression='meal_id = :val',
-                ProjectionExpression='meal_name, price',
-                ExpressionAttributeValues={
-                    ':val': {'S': i['meal_id']}
-                })
+            # product = db.scan(TableName='meals',
+            #     FilterExpression='meal_id = :val',
+            #     ProjectionExpression='meal_name, price',
+            #     ExpressionAttributeValues={
+            #         ':val': {'S': i['meal_id']}
+            #     })
+            #in progress
+
+            #remove when done testing
+            i['meal_id'] = "0608dc7273ed46a79a36d3434fb3b968"
+
+            
+            product = execute(
+                """SELECT meal_name, price
+                    FROM sn_meals
+                    WHERE meal_id = \'""" + i['meal_id'] + """\';""", 'get', conn, skipSerialization=True)
+
             item = {}
             item['meal_id'] = {}
             item['meal_id']['S'] = i['meal_id']
             item['meal_name'] = {}
-            item['meal_name']['S'] = product['Items'][0]['meal_name']['S']
+            #item['meal_name']['S'] = product['Items'][0]['meal_name']['S']
+            item['meal_name']['S'] = product['result'][0]['meal_name']
             item['qty'] = {}
             item['qty']['N'] = str(i['qty'])
             item['price'] = {}
-            item['price']['N'] = product['Items'][0]['price']['S']
+            #item['price']['N'] = product['Items'][0]['price']['S']
+            item['price']['N'] = product['result'][0]['price']
             if (item['qty']['N'] != '0'):
                 order_details.append(item)
-
         order_items = [{"M": x} for x in order_details]
-        
         try:
-            add_order = db.put_item(TableName='meal_orders',
-                Item={'order_id': {'S': order_id},
-                      'created_at': {'S': created_at},
-                      'email': {'S': data['email']},
-                      'name': {'S': data['name']},
-                      'street': {'S': data['street']},
-                      'zipCode': {'N': str(data['zipCode'])},
-                      'city': {'S': data['city']},
-                      'state': {'S': data['state']},
-                      'totalAmount': {'N': str(totalAmount)},
-                      'paid': {'BOOL': data['paid']},
-                      'status': {'S': 'open'},
-                      'paymentType': {'S': data['paymentType']},
-                      'order_items':{'L': order_items},
-                      'phone': {'S': str(data['phone'])},
-                      'delivery_instructions' : {'S': data['delivery_instructions']},
-                      'address_unit' : {'S': data['address_unit']},
-                      'kitchen_id': {'S': str(data['kitchen_id'])},
-                      'notification_enabled': {'BOOL': data['notification_enabled']},
-                      'addressLongitude' : {'S': data['addressLongitude']},
-                      'addressLatitude' : {'S': data['addressLatitude']},
-                      'appVersion' : {'S': data['appVersion']}
-                }
-            )
-
+            # add_order = db.put_item(TableName='meal_orders',
+            #     Item={'order_id': {'S': order_id},
+            #           'created_at': {'S': created_at},
+            #           'email': {'S': data['email']},
+            #           'name': {'S': data['name']},
+            #           'street': {'S': data['street']},
+            #           'zipCode': {'N': str(data['zipCode'])},
+            #           'city': {'S': data['city']},
+            #           'state': {'S': data['state']},
+            #           'totalAmount': {'N': str(totalAmount)},
+            #           'paid': {'BOOL': data['paid']},
+            #           'status': {'S': 'open'},
+            #           'paymentType': {'S': data['paymentType']},
+            #           'order_items':{'L': order_items},
+            #           'phone': {'S': str(data['phone'])},
+            #           'delivery_instructions' : {'S': data['delivery_instructions']},
+            #           'address_unit' : {'S': data['address_unit']},
+            #           'kitchen_id': {'S': str(data['kitchen_id'])},
+            #           'notification_enabled': {'BOOL': data['notification_enabled']},
+            #           'addressLongitude' : {'S': data['addressLongitude']},
+            #           'addressLatitude' : {'S': data['addressLatitude']},
+            #           'appVersion' : {'S': data['appVersion']}
+            #     }
+            # )
+            # add_order = execute(
+            #     """INSERT INTO sn_meals_orders(order_id,created_at,email,name,street,zipCode,city,state,totalAmount,paid,status,paymentType,order_items,phone,delivery_instructions,address_unit,kitchen_id,notification_enabled,addressLongitude,addressLatitude,appVersion)
+            #         VALUES (\'""" + order_id + """\',
+            #                 \'""" + created_at + """\',
+            #                 \'""" + data['email'] + """\',
+            #                 \'""" + data['name'] + """\',
+            #                 \'""" + data['street'] + """\',
+            #                 \'""" + str(data['zipCode']) + """\',
+            #                 \'""" + data['city'] + """\',
+            #                 \'""" + data['state'] + """\',
+            #                 \'""" + str(totalAmount) + """\',
+            #                 \'""" + data['paid'] + """\',
+            #                 \'""" + 'open' + """\',
+            #                 \'""" + data['paymentType'] + """\',
+            #                 \'""" + order_items + """\',
+            #                 \'""" + str(data['phone']) + """\',
+            #                 \'""" + data['delivery_instructions'] + """\',
+            #                 \'""" + data['address_unit'] + """\',
+            #                 \'""" + str(data['kitchen_id']) + """\',
+            #                 \'""" + data['notification_enabled'] + """\',
+            #                 \'""" + data['addressLongitude'] + """\',
+            #                 \'""" + data['addressLatitude'] + """\',
+            #                 \'""" + data['appVersion'] + """\');""", 'post', conn, skipSerialization=True)
+            add_order = execute(
+                """ INSERT INTO sn_meal_orders
+                                (
+                                    order_id,
+                                    paid,
+                                    notification_enabled,
+                                )
+                                VALUES
+                                (
+                                    \'""" + "test1" + """\'
+                                    ,""" + data['paid']+ """
+                                    ,""" + data['notification_enabled'] + """);""", 'post', conn, skipSerialization=False)
+            print(add_order)
+            return
+            #Not working
+            add_order = execute(
+                """ INSERT INTO sn_meal_orders
+                                (
+                                    order_id,
+                                    created_at,
+                                    email,
+                                    name,
+                                    street,
+                                    zipCode,
+                                    city,
+                                    state,
+                                    totalAmount,
+                                    paid,
+                                    status,
+                                    paymentType,
+                                    order_items,
+                                    phone,
+                                    delivery_instructions,
+                                    address_unit,
+                                    kitchen_id,
+                                    notification_enabled,
+                                    addressLongitude,
+                                    addressLatitude,
+                                    appVersion
+                                )
+                                VALUES
+                                (
+                                    \'""" + order_id + """\',
+                                    \'""" + created_at + """\',
+                                    \'""" + data['email'] + """\',
+                                    \'""" + data['name'] + """\',
+                                    \'""" + data['street'] + """\',
+                                    \'""" + str(data['zipCode']) + """\',
+                                    \'""" + data['city'] + """\',
+                                    \'""" + data['state'] + """\',
+                                    \'""" + str(totalAmount) + """\',
+                                    \'""" + data['paid'] + """\',
+                                    \'""" + 'open' + """\',
+                                    \'""" + data['paymentType'] + """\',
+                                    \'""" + order_items + """\',
+                                    \'""" + str(data['phone']) + """\',
+                                    \'""" + data['delivery_instructions'] + """\',
+                                    \'""" + data['address_unit'] + """\',
+                                    \'""" + str(data['kitchen_id']) + """\',
+                                    \'""" + data['notification_enabled'] + """\',
+                                    \'""" + data['addressLongitude'] + """\',
+                                    \'""" + data['addressLatitude'] + """\',
+                                    \'""" + data['appVersion'] + """\');""", 'post', conn, skipSerialization=False)
+            # Remove this return when the queries is working
+            print(add_order)      
+            return      
             kitchen = db.get_item(TableName='kitchens',
                 Key={'kitchen_id': {'S': data['kitchen_id']}},
                 ProjectionExpression='kitchen_name, street, city, \
@@ -401,9 +510,8 @@ class MealOrders(Resource):
             orders = execute(
                 """SELECT *
                     FROM sn_meal_orders
-                    WHERE created_at LIKE \'%""" + todays_date + """%\';""", 'get', conn, skipSerialization=True)
-            return orders
-            response['result'] = orders['Items']
+                    WHERE created_at LIKE \'%""" + todays_date + """%\';""", 'get', conn, skipSerialization=False)
+            response['result'] = orders['result'][0]
             response['message'] = 'Request successful'
             return response, 200
         except:
@@ -958,6 +1066,7 @@ class Kitchen(Resource):
 
 
 class Meals(Resource):
+    #RDS migration In progress Untested
     def post(self, kitchen_id):
         response = {}
 
@@ -996,25 +1105,33 @@ class Meals(Resource):
                 raise BadRequest('Request failed. \
                     Something went wrong uploading a photo.')
 
-            add_meal = db.put_item(TableName='meals',
-                Item={'meal_id': {'S': meal_id},
-                      'created_at': {'S': created_at},
-                      'kitchen_id': {'S': str(kitchen_id)},
-                      'meal_name': {'S': str(request.form['name'])},
-                      'description': {'L': description},
-                      'price': {'S': str(request.form['price'])},
-                      'photo': {'S': photo_path}
-                }
-            )
-
-            kitchen = db.update_item(TableName='kitchens',
-                Key={'kitchen_id': {'S': str(kitchen_id)}},
-                UpdateExpression='SET isOpen = :val',
-                ExpressionAttributeValues={
-                    ':val': {'BOOL': True}
-                }
-            )
-
+            # add_meal = db.put_item(TableName='meals',
+            #     Item={'meal_id': {'S': meal_id},
+            #           'created_at': {'S': created_at},
+            #           'kitchen_id': {'S': str(kitchen_id)},
+            #           'meal_name': {'S': str(request.form['name'])},
+            #           'description': {'L': description},
+            #           'price': {'S': str(request.form['price'])},
+            #           'photo': {'S': photo_path}
+            #     }
+            # )
+            conn = connect()
+            add_meal = execute(
+                """INSERT INTO sn_meals (meal_id, created_at, kitchen_id, meal_name, description, price, photo)
+                    VALUES (\'""" + meal_id + """\', \'""" + created_at + """\', \'""" + str(kitchen_id) + """\', \'""" + str(request.form['name']) + """\', \'""" + description + """\'', \'""" + str(request.form['price']) + """\', \'""" + photo_path + """\' );"""
+                , 'get', conn, skipSerialization=True)
+            # kitchen = db.update_item(TableName='kitchens',
+            #     Key={'kitchen_id': {'S': str(kitchen_id)}},
+            #     UpdateExpression='SET isOpen = :val',
+            #     ExpressionAttributeValues={
+            #         ':val': {'BOOL': True}
+            #     }
+            # )
+            
+            kitchen = execute(
+                """UPDATE sn_kitchens
+                    SET isOpen = \'""" + True + """\'
+                    WHERE kitchen_id = \'""" + kitchen_id + """\';""", 'get', conn, skipSerialization=True)
             response['message'] = 'Request successful'
             return response, 201
         except:
