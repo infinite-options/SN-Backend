@@ -386,23 +386,7 @@ class MealOrders(Resource):
             #                 \'""" + data['addressLongitude'] + """\',
             #                 \'""" + data['addressLatitude'] + """\',
             #                 \'""" + data['appVersion'] + """\');""", 'post', conn, skipSerialization=True)
-            add_order = execute(
-                """ INSERT INTO sn_meal_orders
-                                (
-                                    order_id,
-                                    paid,
-                                    notification_enabled,
-                                )
-                                VALUES
-                                (
-                                    \'""" + "test1" + """\'
-                                    ,""" + data['paid']+ """
-                                    ,""" + data['notification_enabled'] + """);""", 'post', conn, skipSerialization=False)
-            print(add_order)
-            return
-            #Not working
-            add_order = execute(
-                """ INSERT INTO sn_meal_orders
+            query = """ INSERT INTO sn_meal_orders
                                 (
                                     order_id,
                                     created_at,
@@ -428,7 +412,7 @@ class MealOrders(Resource):
                                 )
                                 VALUES
                                 (
-                                    \'""" + order_id + """\',
+                                    \'""" + "test137" + """\',
                                     \'""" + created_at + """\',
                                     \'""" + data['email'] + """\',
                                     \'""" + data['name'] + """\',
@@ -437,20 +421,22 @@ class MealOrders(Resource):
                                     \'""" + data['city'] + """\',
                                     \'""" + data['state'] + """\',
                                     \'""" + str(totalAmount) + """\',
-                                    \'""" + data['paid'] + """\',
+                                    \'""" + str(data['paid']) + """\',
                                     \'""" + 'open' + """\',
                                     \'""" + data['paymentType'] + """\',
-                                    \'""" + order_items + """\',
+                                    \'""" + json.dumps(order_items) + """\',
                                     \'""" + str(data['phone']) + """\',
                                     \'""" + data['delivery_instructions'] + """\',
                                     \'""" + data['address_unit'] + """\',
                                     \'""" + str(data['kitchen_id']) + """\',
-                                    \'""" + data['notification_enabled'] + """\',
+                                    \'""" + str(data['notification_enabled']) + """\',
                                     \'""" + data['addressLongitude'] + """\',
                                     \'""" + data['addressLatitude'] + """\',
-                                    \'""" + data['appVersion'] + """\');""", 'post', conn, skipSerialization=False)
-            # Remove this return when the queries is working
-            print(add_order)      
+                                    \'""" + data['appVersion'] + """\');""";
+            print(query)
+            add_order = execute(query, 'post', conn, skipSerialization=False)
+            print(add_order)
+               
             return      
             kitchen = db.get_item(TableName='kitchens',
                 Key={'kitchen_id': {'S': data['kitchen_id']}},
